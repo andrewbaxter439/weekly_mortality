@@ -224,7 +224,8 @@ ggplotly(tooltip = "text") %>% api_create(filename = "Plot 12")
 # Correction 1 - accounting for weeks 1/2 and 52/53 ----------------------------------------------------------
 
 err_lm <- df %>% 
-  mutate(endyr = 100*exp(Week-55)+1,
+  group_by(Year) %>% 
+  mutate(endyr = 100*exp(Week-ifelse(max(Week) == 53, 56, 55))+1,
          begyr = 100*exp(-Week-2)+1) %>% 
   lm(adj_rate ~ Time + Int1 + Trend1 + endyr + begyr + cos((Time-5)*pi*2/52), data = .)
 

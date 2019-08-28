@@ -1,16 +1,18 @@
-ui <- fluidPage(
-withMathJax(),  
+ library(plotly)
+ ui <- fluidPage(
+   withMathJax(),  
  fluidRow(
-   column(6,
+   column(4,
  selectInput("group",
              "Group to compare: ",
              c("All", "Male", "Female"),
              selected = "All"),
  align = "center"),
-column(6, dateInput("int1date",
+column(4, dateInput("int1date",
            "Select Exposure start date: ",
-           value = "2016-04-22"),
-       align = "center")
+           value = "2018-01-01"),
+       align = "center"),
+column(4, uiOutput("obsRange"), align = "center")
  ),
  fluidRow(
  plotlyOutput("graph"),

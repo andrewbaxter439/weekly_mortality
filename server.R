@@ -34,41 +34,67 @@ testAutocorr <- function(model, data=NULL, max.lag = 10, time.points = 25) {
 }
 
 server <- function(input, output) {
+
+# inputs -----------------------------------------------------------------------------------------------------
+
   data <- read_csv("imported data.csv")
 
   output$hello <- renderText("hello")
   week_start <- reactive({floor((input$int1date - dmy("01/01/2010"))/dweeks(1))})
   
-  df <- reactive({
+  output$obsRange <- renderUI({
+    dateRangeInput("dateRange",
+                   "Dates to observe: ",
+                   start = min(dfpre()$Date),
+                   end = max(dfpre()$Date),
+                   min = min(dfpre()$Date),
+                   max = max(dfpre()$Date))
+  })
+
+# dataframe --------------------------------------------------------------------------------------------------
+
+  dfpre <- reactive({
     data %>% 
       filter(Sex == tolower(input$group)) %>% 
       arrange(Year, Week) %>% 
       mutate(Time = 1:nrow(.)) %>% 
       mutate(Date = dmy("01/01/2010") + weeks(Time)) %>% 
       mutate(Int1 = ifelse(Date<=input$int1date, 0, 1),
-             Trend1 = c(rep(0, week_start()), 1:(max(Time)-week_start())))
+             Trend1 = c(rep(0, week_start()), 1:(max(Time)-week_start()))) %>% 
+      # Including end/beginning markers
+      group_by(Year) %>% 
+      mutate(endyr = 100*exp(Week-ifelse(max(Week) == 53, 55, 54))+1,
+             begyr = 100*exp(-Week-2)+1) %>% 
+      ungroup()
   })
   
+  df <- reactive({filter(dfpre(), Date >= input$dateRange[1], Date <= input$dateRange[2])})
     
 
     md <- reactive({
-      gls(adj_rate ~ Time + Int1 + Trend1 + cos((Time-5)*pi*2/52) , data = df(), correlation = corARMA(p=1), method = "ML")
+      gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-5)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=1), method = "ML")
     })
     
     lmd <- reactive({
-      lm(adj_rate ~ Time + Int1 + Trend1 + cos((Time-5)*pi*2/52) , data = df())
+      lm(adj_rate ~ Time + Int1 + Trend1 + cos((Time-5)*pi*2/52) + endyr + begyr, data = df())
     })
     
     cfac <- reactive({
-      df() %>% mutate(Int1 = 0, Trend1 = 0,
-                          Predict = md()$coefficients[1] +
+      df() %>% mutate(Predict = md()$coefficients[1] +
                             md()$coefficients[2] * Time) %>% 
       filter(Date>input$int1date)
     })
     
   output$graph <- renderPlotly({
     plot <- df() %>% 
-      mutate(Predict = predict(md(), newdata = df()),
+      mutate(
+        # Predict minus seasonal corrections
+        # Predict = md()$coefficients[1] +
+        #   md()$coefficients[2] * Time +
+        #   md()$coefficients[3] * Int1 +
+        #   md()$coefficients[4] * Trend1 +
+        #   md()$coefficients[5] * cos((Time-5)*pi*2/52),
+        Predict = predict(md(), newdata = df()),
              lineTrend = md()$coefficients[1] +
                md()$coefficients[2] * Time +
                md()$coefficients[3] * Int1 +
