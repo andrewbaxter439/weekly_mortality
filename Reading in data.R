@@ -13,6 +13,7 @@ library(rvest)
 library(stringr)
 library(lubridate)
 library(nlme)
+`-.gg` <- function(e1, e2) e2(e1)
 
 constructCIRibbon <- function(newdata, model) {
   newdata <- newdata %>%
@@ -189,14 +190,14 @@ df <- data %>%
 
 
 df %>% mutate(cosT = Time*pi*2/52)
-md <- df %>% gls(adj_rate ~ Time + Int1 + Trend1 + cos((Time-5)*pi*2/52) , data = ., method = "ML")
+lmd <- df %>% lm(adj_rate ~ Time + Int1 + Trend1 + cos((Time-5)*pi*2/52) , data = .)
 
 cfac <- df %>% mutate(Int1 = 0, Trend1 = 0,
                       Predict = md$coefficients[1] +
                         md$coefficients[2] * Time) %>% 
   filter(Date>int1date)
 
-df %>% 
+plotly_out <- df %>% 
   mutate(Predict = predict(md, newdata = df),
          lineTrend = md$coefficients[1] +
            md$coefficients[2] * Time +
@@ -204,14 +205,59 @@ df %>%
            md$coefficients[4] * Trend1
            ) %>% 
   ggplot(aes(Date, adj_rate)) +
-  geom_point() +
+  geom_point(aes(text = paste0("Week ending: ", Date, "<br>Week no: ", Week, "<br>Adjusted rate: ", round(adj_rate, 2)))) +
   geom_line(data = cfac, aes(Date, Predict, col = "Predicted"), linetype = "dashed", size = 1.5) +
   geom_line(aes(y = Predict, group = Int1, col = "Seasonal trend"), size = 1.5, alpha = 0.8) +
   geom_line(aes(y = lineTrend, group = Int1, col = "Trend"), size = 1.5, alpha = 0.8) +
-  geom_vline(xintercept = int1date,
+  geom_vline(xintercept = as.numeric(int1date),
              linetype = "dotted",
              col = "#000000CC") +
-  scale_colour_manual(values = c("Trend" = sphsu_cols("Thistle", names = FALSE),
+  scale_colour_manual(name = "",
+                      values = c("Trend" = sphsu_cols("Thistle", names = FALSE),
                                  "Seasonal trend" = sphsu_cols("University Blue", names = FALSE),
                                  "Predicted" = sphsu_cols("Pumpkin", names = FALSE))) +
   SPHSUgraphs:::theme_sphsu_minimal()
+
+ggplotly(tooltip = "text") %>% api_create(filename = "Plot 12")
+
+
+# Correction 1 - accounting for weeks 1/2 and 52/53 ----------------------------------------------------------
+
+err_lm <- df %>% 
+  mutate(endyr = 100*exp(Week-55)+1,
+         begyr = 100*exp(-Week-2)+1) %>% 
+  lm(adj_rate ~ Time + Int1 + Trend1 + endyr + begyr + cos((Time-5)*pi*2/52), data = .)
+
+df %>% mutate(Predict = predict(err_lm)) %>% 
+  ggplot(aes(Date, group = Int1)) + geom_point(aes(y = adj_rate)) + geom_line(aes(y = Predict)) + 
+  geom_vline(xintercept = int1date,
+             linetype = "dotted",
+             col = "#000000CC")
+
+# Correction 2 - finding fit of cos line ---------------------------------------------------------------------
+
+new_data <- df %>% 
+  mutate(correction = summary(lmd)$coefficients[1] + 
+           summary(lmd)$coefficients[2] * Time +
+           summary(lmd)$coefficients[3] * Int1 +
+           summary(lmd)$coefficients[4] * Trend1,
+         corr_val = (adj_rate-correction)/summary(lmd)$coefficients[5],
+         inv_cos_rate = acos(corr_val)) %>% 
+  filter(!is.na(inv_cos_rate))  #%>%
+ # ggplot(aes(Week, inv_cos_rate)) + geom_point()
+
+corr_lm <-   lm(inv_cos_rate ~ Week + I(Week**2), data = new_data)
+
+new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*(Week**2)) %>% 
+  ggplot(aes(Week, inv_cos_rate)) + geom_point() + geom_line(aes(y = Predict)) - ggplotly
+
+df %>% 
+  mutate(Predict = lmd$coefficients[1] + 
+           lmd$coefficients[2] * Time +
+           lmd$coefficients[3] * Int1 +
+           lmd$coefficients[4] * Trend1 +
+           lmd$coefficients[5] * cos(
+             corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*Week^2
+           )
+           ) %>% 
+  ggplot(aes(Date)) + geom_point(aes(y = adj_rate)) + geom_line(aes(y = Predict, group = Int1))

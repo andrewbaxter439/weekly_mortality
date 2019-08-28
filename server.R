@@ -3,6 +3,9 @@ library(SPHSUgraphs)
 library(readr)
 library(dplyr)
 library(lubridate)
+library(nlme)
+library(plotly)
+`-.gg` <- function(e1, e2) e2(e1)
 
 printCoefficients <- function(model){
   as_tibble(trimws(format(round(summary(model)$tTable, 3), nsmall=3))) %>%
@@ -49,7 +52,7 @@ server <- function(input, output) {
     
 
     md <- reactive({
-      gls(adj_rate ~ Time + Int1 + Trend1 + cos((Time-5)*pi*2/52) , data = df(), method = "ML")
+      gls(adj_rate ~ Time + Int1 + Trend1 + cos((Time-5)*pi*2/52) , data = df(), correlation = corARMA(p=1), method = "ML")
     })
     
     lmd <- reactive({
@@ -63,8 +66,8 @@ server <- function(input, output) {
       filter(Date>input$int1date)
     })
     
-  output$graph <- renderPlot({
-    df() %>% 
+  output$graph <- renderPlotly({
+    plot <- df() %>% 
       mutate(Predict = predict(md(), newdata = df()),
              lineTrend = md()$coefficients[1] +
                md()$coefficients[2] * Time +
@@ -72,17 +75,29 @@ server <- function(input, output) {
                md()$coefficients[4] * Trend1
       ) %>% 
       ggplot(aes(Date, adj_rate)) +
-      geom_point() +
+      geom_point(aes(text = paste0("Week ending: ", Date, "<br>Week no: ", Week, "<br>Adjusted rate: ", round(adj_rate, 2)))) +
       geom_line(data = cfac(), aes(Date, Predict, col = "Predicted"), linetype = "dashed", size = 1.5) +
       geom_line(aes(y = Predict, group = Int1, col = "Seasonal trend"), size = 1.5, alpha = 0.8) +
       geom_line(aes(y = lineTrend, group = Int1, col = "Trend"), size = 1.5, alpha = 0.8) +
-      geom_vline(xintercept = input$int1date,
+      geom_vline(xintercept = as.numeric(input$int1date),
                  linetype = "dotted",
-                 col = "#000000CC") +
-      scale_colour_manual(values = c("Trend" = sphsu_cols("Thistle", names = FALSE),
+                 col = "#000000CC"
+                 ) +
+      scale_colour_manual(name = "",
+                          values = c("Trend" = sphsu_cols("Thistle", names = FALSE),
                                      "Seasonal trend" = sphsu_cols("University Blue", names = FALSE),
                                      "Predicted" = sphsu_cols("Pumpkin", names = FALSE))) +
-      theme_sphsu_light()
+      theme_sphsu_light()+
+      ylab("Age-standardised mortality rate - deaths per 100,000")
+    
+    p <- ggplotly(plot, tooltip = "text")
+    p$elementId <- NULL
+    plotly_IMAGE(p,
+                 width = 1000,
+                 height = 200,
+                 format = "png",
+                 out_file = "output.png")
+    p
   })
   
   coefs <- reactive(printCoefficients(md()))
