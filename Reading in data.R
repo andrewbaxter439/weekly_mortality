@@ -223,13 +223,17 @@ ggplotly(tooltip = "text") %>% api_create(filename = "Plot 12")
 
 # Correction 1 - accounting for weeks 1/2 and 52/53 ----------------------------------------------------------
 
-err_lm <- df %>% 
+
+df_b <-  df %>% 
   group_by(Year) %>% 
   mutate(endyr = 100*exp(Week-ifelse(max(Week) == 53, 56, 55))+1,
          begyr = 100*exp(-Week-2)+1) %>% 
-  lm(adj_rate ~ Time + Int1 + Trend1 + endyr + begyr + cos((Time-5)*pi*2/52), data = .)
+  ungroup()
 
-df %>% mutate(Predict = predict(err_lm)) %>% 
+err_lm <- df_b %>% 
+  lm(adj_rate ~ Time + Int1 + Trend1 + cos((Time-5)*pi*2/52) + endyr + begyr, data = .)
+
+df_b %>% mutate(Predict = predict(err_lm)) %>% 
   ggplot(aes(Date, group = Int1)) + geom_point(aes(y = adj_rate)) + geom_line(aes(y = Predict)) + 
   geom_vline(xintercept = int1date,
              linetype = "dotted",
@@ -237,28 +241,54 @@ df %>% mutate(Predict = predict(err_lm)) %>%
 
 # Correction 2 - finding fit of cos line ---------------------------------------------------------------------
 
-new_data <- df %>% 
-  mutate(correction = summary(lmd)$coefficients[1] + 
-           summary(lmd)$coefficients[2] * Time +
-           summary(lmd)$coefficients[3] * Int1 +
-           summary(lmd)$coefficients[4] * Trend1,
-         corr_val = (adj_rate-correction)/summary(lmd)$coefficients[5],
-         inv_cos_rate = acos(corr_val)) %>% 
-  filter(!is.na(inv_cos_rate))  #%>%
- # ggplot(aes(Week, inv_cos_rate)) + geom_point()
+new_data <- df_b %>% 
+  mutate(correction = err_lm$coefficients[1] + 
+           err_lm$coefficients[2] * Time +
+           err_lm$coefficients[3] * Int1 +
+           err_lm$coefficients[4] * Trend1 +
+           err_lm$coefficients[6] * endyr +
+           err_lm$coefficients[7] * begyr,
+         corr_val = (adj_rate-correction)/err_lm$coefficients[5],
+         inv_cos_rate = acos(corr_val),
+         inv_rate_flat = inv_cos_rate/(Week*2*pi/52)) %>% 
+  filter(!is.na(inv_cos_rate))  %>%
+  ggplot(aes(Week, inv_rate_flat)) + geom_point()
+
+
+cos_corr <- df_b %>% 
+  mutate(correction = err_lm$coefficients[1] + 
+           err_lm$coefficients[2] * Time +
+           err_lm$coefficients[3] * Int1 +
+           err_lm$coefficients[4] * Trend1 +
+           err_lm$coefficients[6] * endyr +
+           err_lm$coefficients[7] * begyr,
+         corr_val = (adj_rate-correction)/err_lm$coefficients[5],
+         inv_cos_rate = acos(corr_val),
+         inv_rate_flat = inv_cos_rate/(Week*2*pi/52)) %>% 
+  filter(!is.na(inv_cos_rate), Week>20)  %>% summarise(int = mean(inv_rate_flat)) %>% pull()
+
+
 
 corr_lm <-   lm(inv_cos_rate ~ Week + I(Week**2), data = new_data)
+corr_lm <-   lm(inv_cos_rate ~ Week + I(Week**2), data = new_data)
+# corr_lm <-   lm(inv_cos_rate ~ Week, data = new_data)
 
-new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*(Week**2)) %>% 
+new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*(Week**2)) %>%
   ggplot(aes(Week, inv_cos_rate)) + geom_point() + geom_line(aes(y = Predict)) - ggplotly
+# new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week) %>% 
+#   ggplot(aes(Week, inv_cos_rate)) + geom_point() + geom_line(aes(y = Predict)) - ggplotly
 
-df %>% 
+df_b %>% 
   mutate(Predict = lmd$coefficients[1] + 
            lmd$coefficients[2] * Time +
            lmd$coefficients[3] * Int1 +
            lmd$coefficients[4] * Trend1 +
            lmd$coefficients[5] * cos(
-             corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*Week^2
-           )
+             # corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*Week**2
+             cos_corr + 2*pi* Week/52
+             # corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week
+           ) +
+           err_lm$coefficients[6] * endyr +
+           err_lm$coefficients[7] * begyr
            ) %>% 
   ggplot(aes(Date)) + geom_point(aes(y = adj_rate)) + geom_line(aes(y = Predict, group = Int1))
