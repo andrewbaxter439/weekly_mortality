@@ -90,14 +90,8 @@ server <- function(input, output) {
       theme_sphsu_light()+
       ylab("Age-standardised mortality rate - deaths per 100,000")
     
-    p <- ggplotly(plot, tooltip = "text")
-    p$elementId <- NULL
-    plotly_IMAGE(p,
-                 width = 1000,
-                 height = 200,
-                 format = "png",
-                 out_file = "output.png")
-    p
+    ggplotly(plot, tooltip = "text")
+
   })
   
   coefs <- reactive(printCoefficients(md()))
