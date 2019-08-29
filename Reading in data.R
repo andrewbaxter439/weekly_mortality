@@ -1,7 +1,7 @@
 
 # setup ------------------------------------------------------------------------------------------------------
 
-
+library(ggplot2)
 library(readxl)
 library(httr)
 library(PHEindicatormethods)
@@ -231,46 +231,33 @@ df_b <-  df %>%
   ungroup()
 
 err_lm <- df_b %>% 
-  lm(adj_rate ~ Time + Int1 + Trend1 + cos((Time-5)*pi*2/52) + endyr + begyr, data = .)
+  lm(adj_rate ~ Time + cos((Time-4.6)*pi*2/52) + endyr + begyr, data = .)
 
 df_b %>% mutate(Predict = predict(err_lm)) %>% 
-  ggplot(aes(Date, group = Int1)) + geom_point(aes(y = adj_rate)) + geom_line(aes(y = Predict)) + 
-  geom_vline(xintercept = int1date,
-             linetype = "dotted",
-             col = "#000000CC")
+  ggplot(aes(Date)) + geom_point(aes(y = adj_rate)) + geom_line(aes(y = Predict))
 
 # Correction 2 - finding fit of cos line ---------------------------------------------------------------------
 
 new_data <- df_b %>% 
   mutate(correction = err_lm$coefficients[1] + 
            err_lm$coefficients[2] * Time +
-           err_lm$coefficients[3] * Int1 +
-           err_lm$coefficients[4] * Trend1 +
-           err_lm$coefficients[6] * endyr +
-           err_lm$coefficients[7] * begyr,
-         corr_val = (adj_rate-correction)/err_lm$coefficients[5],
+           err_lm$coefficients[4] * endyr +
+           err_lm$coefficients[5] * begyr,
+         corr_val = (adj_rate-correction)/err_lm$coefficients[3],
          inv_cos_rate = acos(corr_val),
          inv_rate_flat = inv_cos_rate/(Week*2*pi/52)) %>% 
-  filter(!is.na(inv_cos_rate))  %>%
+  filter(!is.na(inv_cos_rate))  
+
+new_data %>%
   ggplot(aes(Week, inv_rate_flat)) + geom_point()
 
 
-cos_corr <- df_b %>% 
-  mutate(correction = err_lm$coefficients[1] + 
-           err_lm$coefficients[2] * Time +
-           err_lm$coefficients[3] * Int1 +
-           err_lm$coefficients[4] * Trend1 +
-           err_lm$coefficients[6] * endyr +
-           err_lm$coefficients[7] * begyr,
-         corr_val = (adj_rate-correction)/err_lm$coefficients[5],
-         inv_cos_rate = acos(corr_val),
-         inv_rate_flat = inv_cos_rate/(Week*2*pi/52)) %>% 
-  filter(!is.na(inv_cos_rate), Week>20)  %>% summarise(int = mean(inv_rate_flat)) %>% pull()
+cos_corr <-new_data  %>% summarise(int = median(inv_rate_flat)) %>% pull()
 
 
 
 corr_lm <-   lm(inv_cos_rate ~ Week + I(Week**2), data = new_data)
-corr_lm <-   lm(inv_cos_rate ~ Week + I(Week**2), data = new_data)
+# corr_lm <-   lm(inv_cos_rate ~ Week + I(Week**2), data = new_data)
 # corr_lm <-   lm(inv_cos_rate ~ Week, data = new_data)
 
 new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*(Week**2)) %>%
@@ -279,16 +266,47 @@ new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]*
 #   ggplot(aes(Week, inv_cos_rate)) + geom_point() + geom_line(aes(y = Predict)) - ggplotly
 
 df_b %>% 
-  mutate(Predict = lmd$coefficients[1] + 
-           lmd$coefficients[2] * Time +
-           lmd$coefficients[3] * Int1 +
-           lmd$coefficients[4] * Trend1 +
-           lmd$coefficients[5] * cos(
+  mutate(Predict = err_lm$coefficients[1] + 
+           err_lm$coefficients[2] * Time +
+           err_lm$coefficients[3] * cos(
              # corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*Week**2
-             cos_corr + 2*pi* Week/52
+             # -cos_corr + 2*pi* Week/52
+             -4.6*2*pi/52 + 2*pi* Week/52
              # corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week
            ) +
-           err_lm$coefficients[6] * endyr +
-           err_lm$coefficients[7] * begyr
+           err_lm$coefficients[4] * endyr +
+           err_lm$coefficients[5] * begyr
            ) %>% 
+  mutate(rss = (adj_rate-Predict)**2) %>% summarise(mspe = mean(rss))
   ggplot(aes(Date)) + geom_point(aes(y = adj_rate)) + geom_line(aes(y = Predict, group = Int1))
+
+
+# best fit cos corrector -------------------------------------------------------------------------------------
+
+mspes <- c()
+correctors <- c()
+i <- 1
+
+for (i in 1:100) {
+  x <- 4+(i/100)
+  correctors[i] <- x
+    rsss <- df_b %>% 
+  mutate(Predict = err_lm$coefficients[1] + 
+           err_lm$coefficients[2] * Time +
+           err_lm$coefficients[3] * cos(
+             # corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*Week**2
+             # -cos_corr + 2*pi* Week/52
+             -x*2*pi/52 + 2*pi* Week/52
+             # corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week
+           ) +
+           err_lm$coefficients[4] * endyr +
+           err_lm$coefficients[5] * begyr
+           ) %>% 
+  transmute(rss = (adj_rate-Predict)**2)
+  
+  mspes[i] <- mean(rsss$rss)
+  
+  
+}
+
+correctors[which(mspes == min(mspes))]

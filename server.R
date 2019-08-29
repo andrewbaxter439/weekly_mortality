@@ -72,11 +72,11 @@ server <- function(input, output) {
     
 
     md <- reactive({
-      gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-5)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=1), method = "ML")
+      gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=1), method = "ML")
     })
     
     lmd <- reactive({
-      lm(adj_rate ~ Time + Int1 + Trend1 + cos((Time-5)*pi*2/52) + endyr + begyr, data = df())
+      lm(adj_rate ~ Time + Int1 + Trend1 + cos((Time-4.6)*pi*2/52) + endyr + begyr, data = df())
     })
     
     cfac <- reactive({
