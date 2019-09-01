@@ -33,11 +33,13 @@ testAutocorr <- function(model, data=NULL, max.lag = 10, time.points = 25) {
   acf(residuals(model), type = 'partial')
 }
 
+  data <- readRDS("mortality_data.rds")
+  
+  
 server <- function(input, output) {
 
 # inputs -----------------------------------------------------------------------------------------------------
 
-  data <- read_csv("imported data.csv")
 
   output$hello <- renderText("hello")
   week_start <- reactive({floor((input$int1date - dmy("01/01/2010"))/dweeks(1))})
@@ -72,7 +74,7 @@ server <- function(input, output) {
     
 
     md <- reactive({
-      gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=1), method = "ML")
+      gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=1, form = ~ Time), method = "ML")
     })
     
     lmd <- reactive({
