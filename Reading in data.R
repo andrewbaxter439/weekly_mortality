@@ -226,8 +226,8 @@ ggplotly(tooltip = "text") %>% api_create(filename = "Plot 12")
 
 df_b <-  df %>% 
   group_by(Year) %>% 
-  mutate(endyr = 100*exp(Week-ifelse(max(Week) == 53, 56, 55))+1,
-         begyr = 100*exp(-Week-2)+1) %>% 
+  mutate(endyr = 100*exp(Week-ifelse(max(Week) == 53, 56, 55)),
+         begyr = 100*exp(-Week-2)) %>% 
   ungroup()
 
 err_lm <- df_b %>% 
@@ -247,37 +247,43 @@ new_data <- df_b %>%
          inv_cos_rate = acos(corr_val),
          inv_rate_flat = inv_cos_rate/(Week*2*pi/52)) %>% 
   filter(!is.na(inv_cos_rate))  
+# 
+# new_data %>%
+#   ggplot(aes(Week, inv_rate_flat)) + geom_point()
+# 
+# 
+# cos_corr <-new_data  %>% summarise(int = median(inv_rate_flat)) %>% pull()
 
-new_data %>%
-  ggplot(aes(Week, inv_rate_flat)) + geom_point()
 
 
-cos_corr <-new_data  %>% summarise(int = median(inv_rate_flat)) %>% pull()
-
-
-
-corr_lm <-   lm(inv_cos_rate ~ Week + I(Week**2), data = new_data)
+# corr_lm <-   lm(inv_cos_rate ~ Week + I(Week**2), data = new_data)
+corr_lm <-   lm(inv_cos_rate ~ Week + sin(Week*pi/52), data = new_data)
 # corr_lm <-   lm(inv_cos_rate ~ Week + I(Week**2), data = new_data)
 # corr_lm <-   lm(inv_cos_rate ~ Week, data = new_data)
 
-new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*(Week**2)) %>%
-  ggplot(aes(Week, inv_cos_rate)) + geom_point() + geom_line(aes(y = Predict)) - ggplotly
-# new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week) %>% 
+# new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*(Week**2)) %>%
 #   ggplot(aes(Week, inv_cos_rate)) + geom_point() + geom_line(aes(y = Predict)) - ggplotly
+new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]* sin(Week*pi/52)) %>%
+  ggplot(aes(Week, inv_cos_rate)) + geom_point() + geom_line(aes(y = Predict)) - ggplotly
+# new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]* (Week*pi/52) + corr_lm$coefficients[3]* sin(Week)) %>%
+#   ggplot(aes(Week, inv_cos_rate)) + geom_point() + geom_line(aes(y = Predict)) - ggplotly
+# new_data %>% mutate(Predict = corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week) %>%
+#   ggplot(aes(Week, inv_cos_rate)) + geom_point() + geom_line(aes(y = Predict)) - ggplotly
+
 
 df_b %>% 
   mutate(Predict = err_lm$coefficients[1] + 
            err_lm$coefficients[2] * Time +
            err_lm$coefficients[3] * cos(
-             # corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*Week**2
+             corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week + corr_lm$coefficients[3]*sin(Week*pi/52)
              # -cos_corr + 2*pi* Week/52
-             -4.6*2*pi/52 + 2*pi* Week/52
+             # -4.6*2*pi/52 + 2*pi* Week/52
              # corr_lm$coefficients[1] + corr_lm$coefficients[2]* Week
            ) +
            err_lm$coefficients[4] * endyr +
            err_lm$coefficients[5] * begyr
            ) %>% 
-  mutate(rss = (adj_rate-Predict)**2) %>% summarise(mspe = mean(rss))
+  mutate(rss = (adj_rate-Predict)**2) %>% #summarise(mspe = mean(rss))
   ggplot(aes(Date)) + geom_point(aes(y = adj_rate)) + geom_line(aes(y = Predict, group = Int1))
 
 

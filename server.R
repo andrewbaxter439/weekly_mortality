@@ -16,7 +16,7 @@ printCoefficients <- function(model){
 
 testAutocorr <- function(model, data=NULL, max.lag = 10, time.points = 25) {
   # data <- eval(model$call$data)
-  # par(cex = 0.7, mai = c(0.1, 0.1, 0.2, 0.1))
+  par(cex = 0.7, mai = c(0.1, 0.1, 0.2, 0.1))
   # par(fig = c(0.03, 1, 0.8, 1))
   # plot(
   #   data$Year[1:time.points],
@@ -26,11 +26,11 @@ testAutocorr <- function(model, data=NULL, max.lag = 10, time.points = 25) {
   #   col = "red"
   # )
   
-  par(fig = c(0.03, 0.5, 0.05, 0.75), new = TRUE)
-  acf(residuals(model))
+  par(fig = c(0.03, 0.5, 0.05, 0.9), new = TRUE)
+  acf(residuals(model, type = "normalized"))
   
-  par(fig = c(0.55, 1, 0.05, 0.75), new = TRUE)
-  acf(residuals(model), type = 'partial')
+  par(fig = c(0.55, 1, 0.05, 0.9), new = TRUE)
+  acf(residuals(model, type = "normalized"), type = 'partial')
 }
 
 data <- readRDS("mortality_data.rds")
@@ -85,8 +85,8 @@ server <- function(input, output) {
              Trend1 = c(rep(0, week_start()), 1:(max(Time)-week_start()))) %>%
       # Including end/beginning markers
       group_by(Year) %>%
-      mutate(endyr = 100*exp(Week-ifelse(max(Week) == 53, 55, 54))+1,
-             begyr = 100*exp(-Week-2)+1) %>%
+      mutate(endyr = 100*exp(Week-ifelse(max(Week) == 53, 55, 54)),
+             begyr = 100*exp(-Week-2)) %>%
       ungroup()
   })
   
@@ -95,7 +95,22 @@ server <- function(input, output) {
   
   md <- reactive({
     req(input$int1date, input$group, input$dateRange)
-    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=1, form = ~ Time), method = "ML")
+    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=input$p, q = input$q, form = ~ Time), method = "ML")
+  })
+
+    md_null_q <- reactive({
+    req(input$int1date, input$group, input$dateRange)
+    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=input$p, q = 0, form = ~ Time), method = "ML")
+  })
+    
+    md_null_p <- reactive({
+    req(input$int1date, input$group, input$dateRange)
+    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p = 0, q = input$q, form = ~ Time), method = "ML")
+  })
+
+        md_p1q1 <- reactive({
+    req(input$int1date, input$group, input$dateRange)
+    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p = 1, q = 1, form = ~ Time), method = "ML")
   })
   
   md_null <- reactive({
@@ -152,12 +167,68 @@ server <- function(input, output) {
   coefs <- reactive(printCoefficients(md()))
   
   output$coefs <- renderDataTable(coefs(), options = list(searching = FALSE, paging = FALSE))
-  output$autocorr <- renderPlot({testAutocorr(lmd())})
   
+
+# autocorrelation bits ---------------------------------------------------------------------------------------
+
   
+  output$autocorr_null <- renderPlot({req(input$autocorr_show); testAutocorr(md_null())})
+  output$autocorr <- renderPlot({req(input$autocorr_show); testAutocorr(md())})
+  
+  output$AC1title <- renderText({req(input$autocorr_show); "Autocorrelation detection (non-corrected plots):"})
+  
+  output$ac_corr <- renderText({
+    req(input$autocorr_show)
+    paste0("Autocorrelation Correction (", modelText(), ")")
+  })
+
+  modelText <- reactive({paste0(
+    ifelse(input$p!=0, paste0("AR", input$p, " "), ""),  ifelse(input$q!=0, paste0("MA", input$q, " "), ""), "autocorrelation model")
+  })
+    
+    output$anova1_title <- renderText({req(input$autocorr_show && (input$p+input$q) != 0); paste0("ANOVA comparison: null-autocorrelation model and ", modelText())})
+    
+  output$anova1 <- renderDataTable(options = list(searching = FALSE, paging = FALSE), {
+    req(input$autocorr_show && (input$p+input$q) != 0)
+    df <- anova(md_null(), md()) %>% 
+      mutate(call = c("Null autocorrelation model", modelText()))
+  })
+
+  
+  null_q_text <- reactive({paste0(paste0("AR", input$p, " "), "MA0")})
+    output$anova2_title <- renderText({req(input$autocorr_show && input$q!=0 && input$p!=0); paste0("ANOVA comparison: ", modelText(), " and ", null_q_text())})
+  
+    output$anova2 <- renderDataTable(options = list(searching = FALSE, paging = FALSE), {
+      req(input$q!=0  && input$p!=0)
+    req(input$autocorr_show)
+    df <- anova(md_null_q(), md_null()) %>% 
+      mutate(call = c(modelText(), null_q_text()))
+  })
+    
+    null_p_text <- reactive({paste0("AR0 ", paste0("MA", input$q, " "), "")})
+    output$anova3_title <- renderText({req(input$autocorr_show && input$p!=0 && input$q!=0); paste0("ANOVA comparison: ", modelText(), " and ", null_p_text())})
+  
+    output$anova3 <- renderDataTable(options = list(searching = FALSE, paging = FALSE), {
+      req(input$p!=0 && input$q!=0)
+    req(input$autocorr_show)
+    df <- anova(md_null_p(), md_null()) %>% 
+      mutate(call = c(modelText(), null_p_text()))
+  })
+  
+
+
+    output$anova4_title <- renderText({req(input$autocorr_show && input$p==1 && input$q==3); paste0("ANOVA comparison: ", modelText(), " and AR1, MA1")})
+  
+    output$anova4 <- renderDataTable(options = list(searching = FALSE, paging = FALSE), {
+      req(input$p==1 && input$q==3)
+    req(input$autocorr_show)
+    df <- anova(md_null_p(), md_p1q1()) %>% 
+      mutate(call = c(modelText(), "AR1, MA1"))
+  })
   # temp bits --------------------------------------------------------------------------------------------------
   
   output$data_table <- renderDataTable({req(input$int1date, input$group, input$dateRange)
     df()})  
+  
   
 }
