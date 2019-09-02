@@ -33,61 +33,88 @@ testAutocorr <- function(model, data=NULL, max.lag = 10, time.points = 25) {
   acf(residuals(model), type = 'partial')
 }
 
-  data <- readRDS("mortality_data.rds")
-  
-  
+data <- readRDS("mortality_data.rds")
+
+
 server <- function(input, output) {
-
-# inputs -----------------------------------------------------------------------------------------------------
-
-
+  
+  # inputs -----------------------------------------------------------------------------------------------------
+  
+  
   output$hello <- renderText("hello")
   week_start <- reactive({floor((input$int1date - dmy("01/01/2010"))/dweeks(1))})
   
   output$obsRange <- renderUI({
     dateRangeInput("dateRange",
                    "Dates to observe: ",
+                   # start = "2010-01-01",
+                   # end = "2019-08-01",
+                   # min = "2010-01-01",
+                   # max = "2019-08-01")
                    start = min(dfpre()$Date),
                    end = max(dfpre()$Date),
                    min = min(dfpre()$Date),
                    max = max(dfpre()$Date))
   })
-
-# dataframe --------------------------------------------------------------------------------------------------
-
+  
+  # dataframe --------------------------------------------------------------------------------------------------
+  
+  # df <- reactive({
+  #   data %>% 
+  #     filter(Sex == tolower(input$group)) %>% 
+  #     arrange(Year, Week) %>% 
+  #     mutate(Time = 1:nrow(.)) %>% 
+  #     mutate(Date = dmy("01/01/2010") + weeks(Time)) %>% 
+  #     mutate(Int1 = ifelse(Date<=input$int1date, 0, 1),
+  #            Trend1 = c(rep(0, week_start()), 1:(max(Time)-week_start()))) %>% 
+  #     # Including end/beginning markers
+  #     group_by(Year) %>% 
+  #     mutate(endyr = 100*exp(Week-ifelse(max(Week) == 53, 55, 54))+1,
+  #            begyr = 100*exp(-Week-2)+1) %>% 
+  #     ungroup() %>% 
+  #     filter(Date >= input$dateRange[1], Date <= input$dateRange[2])
+  # })
+  
   dfpre <- reactive({
-    data %>% 
-      filter(Sex == tolower(input$group)) %>% 
-      arrange(Year, Week) %>% 
-      mutate(Time = 1:nrow(.)) %>% 
-      mutate(Date = dmy("01/01/2010") + weeks(Time)) %>% 
+    data %>%
+      filter(Sex == tolower(input$group)) %>%
+      arrange(Year, Week) %>%
+      mutate(Time = 1:nrow(.)) %>%
+      mutate(Date = dmy("01/01/2010") + weeks(Time)) %>%
       mutate(Int1 = ifelse(Date<=input$int1date, 0, 1),
-             Trend1 = c(rep(0, week_start()), 1:(max(Time)-week_start()))) %>% 
+             Trend1 = c(rep(0, week_start()), 1:(max(Time)-week_start()))) %>%
       # Including end/beginning markers
-      group_by(Year) %>% 
+      group_by(Year) %>%
       mutate(endyr = 100*exp(Week-ifelse(max(Week) == 53, 55, 54))+1,
-             begyr = 100*exp(-Week-2)+1) %>% 
+             begyr = 100*exp(-Week-2)+1) %>%
       ungroup()
   })
   
   df <- reactive({filter(dfpre(), Date >= input$dateRange[1], Date <= input$dateRange[2])})
-    
-
-    md <- reactive({
-      gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=1, form = ~ Time), method = "ML")
-    })
-    
-    lmd <- reactive({
-      lm(adj_rate ~ Time + Int1 + Trend1 + cos((Time-4.6)*pi*2/52) + endyr + begyr, data = df())
-    })
-    
-    cfac <- reactive({
-      df() %>% mutate(Predict = md()$coefficients[1] +
-                            md()$coefficients[2] * Time) %>% 
+  
+  
+  md <- reactive({
+    req(input$int1date, input$group, input$dateRange)
+    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=1, form = ~ Time), method = "ML")
+  })
+  
+  md_null <- reactive({
+    req(input$int1date, input$group, input$dateRange)
+    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = NULL, method = "ML")
+  })
+  
+  # lmd <- reactive({
+  #   lm(adj_rate ~ Time + Int1 + Trend1 + cos((Time-4.6)*pi*2/52) + endyr + begyr, data = df())
+  # })
+  # 
+  cfac <- reactive({
+    df() %>% mutate(Predict = md()$coefficients[1] +
+                      md()$coefficients[2] * Time) %>% 
       filter(Date>input$int1date)
-    })
-    
+  })
+  
   output$graph <- renderPlotly({
+    req(input$int1date, input$group, input$dateRange)
     plot <- df() %>% 
       mutate(
         # Predict minus seasonal corrections
@@ -97,10 +124,10 @@ server <- function(input, output) {
         #   md()$coefficients[4] * Trend1 +
         #   md()$coefficients[5] * cos((Time-5)*pi*2/52),
         Predict = predict(md(), newdata = df()),
-             lineTrend = md()$coefficients[1] +
-               md()$coefficients[2] * Time +
-               md()$coefficients[3] * Int1 +
-               md()$coefficients[4] * Trend1
+        lineTrend = md()$coefficients[1] +
+          md()$coefficients[2] * Time +
+          md()$coefficients[3] * Int1 +
+          md()$coefficients[4] * Trend1
       ) %>% 
       ggplot(aes(Date, adj_rate)) +
       geom_point(aes(text = paste0("Week ending: ", Date, "<br>Week no: ", Week, "<br>Adjusted rate: ", round(adj_rate, 2)))) +
@@ -110,7 +137,7 @@ server <- function(input, output) {
       geom_vline(xintercept = as.numeric(input$int1date),
                  linetype = "dotted",
                  col = "#000000CC"
-                 ) +
+      ) +
       scale_colour_manual(name = "",
                           values = c("Trend" = sphsu_cols("Thistle", names = FALSE),
                                      "Seasonal trend" = sphsu_cols("University Blue", names = FALSE),
@@ -119,11 +146,18 @@ server <- function(input, output) {
       ylab("Age-standardised mortality rate - deaths per 100,000")
     
     ggplotly(plot, tooltip = "text")
-
+    
   })
   
   coefs <- reactive(printCoefficients(md()))
   
   output$coefs <- renderDataTable(coefs(), options = list(searching = FALSE, paging = FALSE))
   output$autocorr <- renderPlot({testAutocorr(lmd())})
+  
+  
+  # temp bits --------------------------------------------------------------------------------------------------
+  
+  output$data_table <- renderDataTable({req(input$int1date, input$group, input$dateRange)
+    df()})  
+  
 }

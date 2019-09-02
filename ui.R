@@ -28,6 +28,6 @@ ui <- fluidPage(
    # fluidRow(column(12, h5(textOutput("ac_corr")))),
    # fluidRow(plotOutput("autocorr_gls")),
    # htmlOutput("corrcompare"),
-   dataTableOutput("data_table"),
+   # dataTableOutput("data_table"),
    p()
 )
