@@ -5,6 +5,7 @@ library(dplyr)
 library(lubridate)
 library(nlme)
 library(plotly)
+library(rvest)
 `-.gg` <- function(e1, e2) e2(e1)
 
 printCoefficients <- function(model){
@@ -56,6 +57,60 @@ server <- function(input, output) {
                    min = min(dfpre()$Date),
                    max = max(dfpre()$Date))
   })
+  
+
+# check for new data ------------------------------------------------------
+
+  links <- read_html("https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales") %>% 
+    html_nodes("a") %>% 
+    html_attr("href")
+  part_url <- links[which(grepl("englandandwales%2f2020/publishedweek", links))]
+  
+  weekpb <- as.numeric(gsub("^.*publishedweek(\\d{2})2020.xls", "\\1", part_url))
+  
+  max_2020 <- data %>% 
+    filter(Year == 2020) %>% 
+    summarise(maxw = max(Week)) %>% 
+    pull(maxw)
+  
+  if (max(as.numeric(data$Week)) < weekpb){
+  GET(url = paste0("https://www.ons.gov.uk", part_url), write_disk(tf <- tempfile(fileext = ".xls")))
+  import_2020 <- read_xls(tf, sheet = 4, skip = 2)
+  unlink(tf)
+  
+  colnames(import_2020)[2] <- "Age"
+  
+  start <- which(grepl("Males", import_2020$Age))[1] + 2
+  end <- start + 6
+  
+  import_2020[start:end, "Sex"] <- "male"
+  
+  start <- which(grepl("Females", import_2020$Age))[1] + 2
+  end <- start + 6
+  
+  import_2020[start:end, "Sex"] <- "female"
+  
+  start <- which(grepl("Persons", import_2020$Age))[1] + 2
+  end <- start + 6
+  
+  import_2020[start:end, "Sex"] <- "all"
+  
+  import_2020[, "Year"] <- 2020
+  
+  dat_2020 <- import_2020 %>% 
+    select(Year, Sex, Age, '1':ncol(.)) %>% 
+    filter(!is.na(Sex)) %>% 
+    gather("Week", "deaths", -1:-3) %>% 
+    filter(!is.na(deaths)) %>% 
+    mutate_at(c(1,4,5), function(x) as.numeric(x))
+  
+  weights <- read_csv("european_standard_population.csv") %>% 
+    group_by(Group) %>% 
+    summarise(wgt = sum(EuropeanStandardPopulation)) %>% 
+    mutate(Age = unique(tidy_priors$Age))
+  
+  }
+  
   
   # dataframe --------------------------------------------------------------------------------------------------
   
@@ -160,6 +215,7 @@ server <- function(input, output) {
       theme_sphsu_light()+
       ylab("Age-standardised mortality rate - deaths per 100,000")
     
+    hide("loading-content", anim = TRUE, animType = "fade")
     ggplotly(plot, tooltip = "text")
     
   })

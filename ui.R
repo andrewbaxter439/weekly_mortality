@@ -4,12 +4,13 @@ library(shinyjs)
 appCSS <- "
 #loading-content {
   position: absolute;
-  background: #000000;
-  opacity: 0.9;
+  background: #5555AA;
+  opacity: 0.7;
   z-index: 100;
   left: 0;
   right: 0;
   height: 100%;
+  padding: 100px;
   text-align: center;
   color: #FFFFFF;
 }
@@ -17,7 +18,12 @@ appCSS <- "
 
 ui <- fluidPage(
    withMathJax(),  
+   useShinyjs(),
+   inlineCSS(appCSS),
    fluidRow(
+      div(id = "loading-content",
+          h2("Checking for latest data and constructing graph"),
+          h3("This will take a few seconds...")),
       column(4,
              selectInput("group",
                          "Group to compare: ",
