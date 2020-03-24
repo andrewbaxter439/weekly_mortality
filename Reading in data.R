@@ -29,7 +29,7 @@ constructCIRibbon <- function(newdata, model) {
 
 # import data ------------------------------------------------------------------------------------------------
 
-set_config(use_proxy(url="wwwcache.gla.ac.uk", port=8080))
+# set_config(use_proxy(url="wwwcache.gla.ac.uk", port=8080))
 url_start <- "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales/"
 prior_data <- list()
 
@@ -39,7 +39,7 @@ for (yr in 2010:2015){
   unlink(tf)
 }
 
-for (yr in 2016:2018){
+for (yr in 2016:2019){
   GET(url = paste0(url_start, yr, "/publishedweek52", yr, ".xls"), write_disk(tf <- tempfile(fileext = ".xls")))
   prior_data[[paste(yr)]] <- read_xls(tf, sheet = 4, skip = 2)
   unlink(tf)
@@ -51,13 +51,13 @@ for (i in 1:6){
 }
     
 i <- 7
-for (i in 7:9){
+for (i in 7:10){
   colnames(prior_data[i][[1]])[2] <- "Age"
 }
 
 i <- 1
 
-for (i in 1:9) {
+for (i in 1:10) {
 start <- which(grepl("Males", prior_data[i][[1]]$Age))[1] + 2
 end <- start + 6
 
@@ -86,53 +86,62 @@ tidy_priors <- map(prior_data, function(x) x %>%
   mutate_at(c(1,4,5), function(x) as.numeric(x))
 
 
-# 2019 data --------------------------------------------------------------------------------------------------
+# 2020 data --------------------------------------------------------------------------------------------------
 
-page <- read_html("https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales")
-grepl("englandandwales/2019/publishedweek", page[2])
-part_url <- str_extract(as.character(page), "/file\\?uri\\=/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales/2019/publishedweek\\d{2}2019.xls")
-weekpb <- as.numeric(gsub("^.*publishedweek(\\d{2})2019.xls", "\\1", part_url))
+links <- read_html("https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales") %>% 
+  html_nodes("a") %>% 
+  html_attr("href")
+part_url <- links[which(grepl("englandandwales%2f2020/publishedweek", links))]
+
+# part_url <- str_extract(as.character(page), "/file\\?uri\\=/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales/2020/publishedweek\\d{2}2020.xls")
+
+weekpb <- as.numeric(gsub("^.*publishedweek(\\d{2})2020.xls", "\\1", part_url))
 
 
-if (max(as.numeric(dat_2019$Week)) < weekpb){
+# if (max(as.numeric(dat_2019$Week)) < weekpb){
   GET(url = paste0("https://www.ons.gov.uk", part_url), write_disk(tf <- tempfile(fileext = ".xls")))
-  import_2019 <- read_xls(tf, sheet = 4, skip = 2)
+  import_2020 <- read_xls(tf, sheet = 4, skip = 2)
   unlink(tf)
 
-  colnames(import_2019)[2] <- "Age"
+  colnames(import_2020)[2] <- "Age"
   
-  start <- which(grepl("Males", import_2019$Age))[1] + 2
+  start <- which(grepl("Males", import_2020$Age))[1] + 2
   end <- start + 6
   
-  import_2019[start:end, "Sex"] <- "male"
+  import_2020[start:end, "Sex"] <- "male"
   
-  start <- which(grepl("Females", import_2019$Age))[1] + 2
+  start <- which(grepl("Females", import_2020$Age))[1] + 2
   end <- start + 6
   
-  import_2019[start:end, "Sex"] <- "female"
+  import_2020[start:end, "Sex"] <- "female"
   
-  start <- which(grepl("Persons", import_2019$Age))[1] + 2
+  start <- which(grepl("Persons", import_2020$Age))[1] + 2
   end <- start + 6
   
-  import_2019[start:end, "Sex"] <- "all"
+  import_2020[start:end, "Sex"] <- "all"
   
-  import_2019[, "Year"] <- 2019
+  import_2020[, "Year"] <- 2020
   
-  dat_2019 <- import_2019 %>% 
+  dat_2020 <- import_2020 %>% 
     select(Year, Sex, Age, '1':ncol(.)) %>% 
     filter(!is.na(Sex)) %>% 
     gather("Week", "deaths", -1:-3) %>% 
     filter(!is.na(deaths)) %>% 
     mutate_at(c(1,4,5), function(x) as.numeric(x))
   
-  }
+  # }
 
 # other data -------------------------------------------------------------------------------------------------
 
-com_dat <- bind_rows(tidy_priors, dat_2019)
+com_dat <- bind_rows(tidy_priors, dat_2020)
 
-weights <-  tibble(Age = unique(tidy_priors$Age),
-                   wgt = age_prop)
+# weights <-  tibble(Age = unique(tidy_priors$Age),
+#                    wgt = age_prop)
+  
+weights <- read_csv("european_standard_population.csv") %>% 
+  group_by(Group) %>% 
+  summarise(wgt = sum(EuropeanStandardPopulation)) %>% 
+  mutate(Age = unique(tidy_priors$Age))
 
 allpops <- read_csv("data/HMD_allpops") %>% 
   filter(grepl("GBRTENW", .$Code), Year > 2009) %>% 
@@ -155,15 +164,24 @@ pop_age_grps <- allpops %>% left_join(agekeys, by = "ageyr") %>%
   mutate(Age = ifelse(is.na(Age), "85+", Age)) %>% 
   group_by(Age, Year) %>% 
   summarise_at(2:4, sum) %>% 
-  mutate(male = Male, female = Female, all = Total) %>% 
+  rename(male = Male, female = Female, all = Total) %>% 
   gather("Sex", "pop", -1:-2)
 
-estimates_18_19 <- pop_age_grps %>% 
-  filter(Year>=2016) %>% 
-  mutate(Year = Year + 2) %>% 
-  bind_rows(pop_age_grps)
+full_ages <- pop_age_grps %>% 
+  filter(Year>=2015) %>% 
+  mutate(Year = Year + 3) %>% 
+  select(-pop) %>% 
+  bind_rows(pop_age_grps) %>% 
+  group_by(Age, Sex) %>% 
+  mutate(pop = zoo::na.approx(pop, rule = 2))
+  
+
+# estimates_18_19 <- pop_age_grps %>% 
+#   filter(Year>=2016) %>% 
+#   mutate(Year = Year + 2) %>% 
+#   bind_rows(pop_age_grps)
     
-data <- full_join(com_dat, estimates_18_19, by = c("Year", "Age", "Sex")) %>% 
+data <- full_join(com_dat, full_ages, by = c("Year", "Age", "Sex")) %>% 
   filter(!is.na(Week)) %>%
   full_join(weights, by = "Age") %>% 
   mutate(rate_crude = deaths/pop, 
@@ -172,8 +190,9 @@ data <- full_join(com_dat, estimates_18_19, by = c("Year", "Age", "Sex")) %>%
   summarise(adj_rate = sum(expected_deaths, na.rm = TRUE)) %>% 
   ungroup()
 
-write.csv(data, "imported data.csv", row.names = FALSE)
-
+saveRDS(data, file = "data/imported_data.rds")
+# write.csv(data, "imported data.csv", row.names = FALSE)
+data2 <- data
 
 # practicing model and graphs --------------------------------------------------------------------------------
 
@@ -316,3 +335,38 @@ for (i in 1:100) {
 }
 
 correctors[which(mspes == min(mspes))]
+
+
+
+# fft --------------------------------------------------------------------------------------------------------
+
+rate <- data %>% 
+  filter(Sex == "all") %>% 
+  arrange(Year, Week) %>%
+  pull(adj_rate)
+
+tot_dat <- data %>% 
+  arrange(Year, Week) %>%
+  filter(Sex == "all") %>% 
+  mutate(Time = 1:nrow(.))
+
+trend <- lm(adj_rate ~ Time, tot_dat)
+
+trend$residuals
+  
+transform <- fft(rate, inverse = FALSE)/length(rate)
+
+Mod(transform)
+
+plot.frequency.spectrum(transform, xlimits = c(0,12))
+
+plot(Mod(transform), t = "h", xlim = c(0,12))
+
+
+tot_dat %>% 
+  mutate(transform = Mod(fft(.$adj_rate, inverse = TRUE))) %>% 
+  ggplot(aes(Time, pred)) + geom_line() + xlim(2,500) + ylim(0,100)
+
+tot_dat$pred <- get.trajectory(transform, ts = tot_dat$Time, acq.freq = 52)/52
+
+plot(tot_dat$Time, tot_dat$pred, type = "l")

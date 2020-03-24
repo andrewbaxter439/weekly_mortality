@@ -33,7 +33,7 @@ testAutocorr <- function(model, data=NULL, max.lag = 10, time.points = 25) {
   acf(residuals(model, type = "normalized"), type = 'partial')
 }
 
-data <- readRDS("mortality_data.rds")
+data <- readRDS("data/imported_data.rds")
 
 
 server <- function(input, output) {
@@ -95,27 +95,27 @@ server <- function(input, output) {
   
   md <- reactive({
     req(input$int1date, input$group, input$dateRange)
-    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=input$p, q = input$q, form = ~ Time), method = "ML")
+    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52.14)  + endyr + begyr, data = df(), correlation = corARMA(p=input$p, q = input$q, form = ~ Time), method = "ML")
   })
 
     md_null_q <- reactive({
     req(input$int1date, input$group, input$dateRange)
-    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p=input$p, q = 0, form = ~ Time), method = "ML")
+    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52.14)  + endyr + begyr, data = df(), correlation = corARMA(p=input$p, q = 0, form = ~ Time), method = "ML")
   })
     
     md_null_p <- reactive({
     req(input$int1date, input$group, input$dateRange)
-    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p = 0, q = input$q, form = ~ Time), method = "ML")
+    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52.14)  + endyr + begyr, data = df(), correlation = corARMA(p = 0, q = input$q, form = ~ Time), method = "ML")
   })
 
         md_p1q1 <- reactive({
     req(input$int1date, input$group, input$dateRange)
-    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = corARMA(p = 1, q = 1, form = ~ Time), method = "ML")
+    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52.14)  + endyr + begyr, data = df(), correlation = corARMA(p = 1, q = 1, form = ~ Time), method = "ML")
   })
   
   md_null <- reactive({
     req(input$int1date, input$group, input$dateRange)
-    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52)  + endyr + begyr, data = df(), correlation = NULL, method = "ML")
+    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52.14)  + endyr + begyr, data = df(), correlation = NULL, method = "ML")
   })
   
   # lmd <- reactive({
