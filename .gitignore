@@ -2,9 +2,11 @@
 .Rhistory
 .RData
 .Ruserdata
-/data
+!data/
+data/*
 /graphs
+!data/imported_data.rds
 /old files
 stuff for correlation testing.R
 imported data.csv
-!data/imported_data.rds
+
