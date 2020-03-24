@@ -73,42 +73,61 @@ server <- function(input, output) {
     summarise(maxw = max(Week)) %>% 
     pull(maxw)
   
-  if (max(as.numeric(data$Week)) < weekpb){
-  GET(url = paste0("https://www.ons.gov.uk", part_url), write_disk(tf <- tempfile(fileext = ".xls")))
-  import_2020 <- read_xls(tf, sheet = 4, skip = 2)
-  unlink(tf)
-  
-  colnames(import_2020)[2] <- "Age"
-  
-  start <- which(grepl("Males", import_2020$Age))[1] + 2
-  end <- start + 6
-  
-  import_2020[start:end, "Sex"] <- "male"
-  
-  start <- which(grepl("Females", import_2020$Age))[1] + 2
-  end <- start + 6
-  
-  import_2020[start:end, "Sex"] <- "female"
-  
-  start <- which(grepl("Persons", import_2020$Age))[1] + 2
-  end <- start + 6
-  
-  import_2020[start:end, "Sex"] <- "all"
-  
-  import_2020[, "Year"] <- 2020
-  
-  dat_2020 <- import_2020 %>% 
-    select(Year, Sex, Age, '1':ncol(.)) %>% 
-    filter(!is.na(Sex)) %>% 
-    gather("Week", "deaths", -1:-3) %>% 
-    filter(!is.na(deaths)) %>% 
-    mutate_at(c(1,4,5), function(x) as.numeric(x))
-  
-  weights <- read_csv("european_standard_population.csv") %>% 
-    group_by(Group) %>% 
-    summarise(wgt = sum(EuropeanStandardPopulation)) %>% 
-    mutate(Age = unique(tidy_priors$Age))
-  
+  if (max_2020 < weekpb){
+    links <- read_html("https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales") %>% 
+      html_nodes("a") %>% 
+      html_attr("href")
+    part_url <- links[which(grepl("englandandwales%2f2020/publishedweek", links))]
+    
+    GET(url = paste0("https://www.ons.gov.uk", part_url), write_disk(tf <- tempfile(fileext = ".xls")))
+    import_2020 <- read_xls(tf, sheet = 4, skip = 2)
+    unlink(tf)
+    
+    colnames(import_2020)[2] <- "Age"
+    
+    start <- which(grepl("Males", import_2020$Age))[1] + 2
+    end <- start + 6
+    
+    import_2020[start:end, "Sex"] <- "male"
+    
+    start <- which(grepl("Females", import_2020$Age))[1] + 2
+    end <- start + 6
+    
+    import_2020[start:end, "Sex"] <- "female"
+    
+    start <- which(grepl("Persons", import_2020$Age))[1] + 2
+    end <- start + 6
+    
+    import_2020[start:end, "Sex"] <- "all"
+    
+    import_2020[, "Year"] <- 2020
+    
+    dat_2020 <- import_2020 %>% 
+      select(Year, Sex, Age, '1':ncol(.)) %>% 
+      filter(!is.na(Sex)) %>% 
+      gather("Week", "deaths", -1:-3) %>% 
+      filter(!is.na(deaths),
+             Week>max_2020) %>% 
+      mutate_at(c(1,4,5), function(x) as.numeric(x))
+    
+    weights <- read_csv("european_standard_population.csv") %>% 
+      group_by(Group) %>% 
+      summarise(wgt = sum(EuropeanStandardPopulation)) %>% 
+      mutate(Age = c("Under 1 year", "01-14", "15-44", "45-64", "65-74", "75-84", 
+                     "85+"))
+    
+    readRDS("data/pop_estimates.rds")
+    
+    data <- dat_2020 %>% 
+      full_join(pop_2020, by = c("Year", "Age", "Sex")) %>% 
+      full_join(weights, by = c("Age")) %>% 
+      mutate(rate_crude = deaths/pop, 
+             expected_deaths = rate_crude * wgt) %>% 
+      group_by(Sex, Year, Week) %>% 
+      summarise(adj_rate = sum(expected_deaths, na.rm = TRUE)) %>% 
+      ungroup() %>% 
+      bind_rows(f_data)
+    
   }
   
   

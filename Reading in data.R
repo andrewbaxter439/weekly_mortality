@@ -175,6 +175,10 @@ full_ages <- pop_age_grps %>%
   group_by(Age, Sex) %>% 
   mutate(pop = zoo::na.approx(pop, rule = 2))
   
+pop_2020 <- full_ages %>% 
+  filter(Year == 2020)
+
+  # saveRDS(pop_2020, "data/pop_estimates.rds")
 
 # estimates_18_19 <- pop_age_grps %>% 
 #   filter(Year>=2016) %>% 
