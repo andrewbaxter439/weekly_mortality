@@ -222,7 +222,7 @@ server <- function(input, output) {
   
   coefs <- reactive(printCoefficients(md()))
   
-  output$coefs <- renderDataTable(coefs(), options = list(searching = FALSE, paging = FALSE))
+  output$coefs <- DT::renderDataTable(coefs(), options = list(searching = FALSE, paging = FALSE))
   
 
 # autocorrelation bits ---------------------------------------------------------------------------------------
@@ -244,7 +244,7 @@ server <- function(input, output) {
     
     output$anova1_title <- renderText({req(input$autocorr_show && (input$p+input$q) != 0); paste0("ANOVA comparison: null-autocorrelation model and ", modelText())})
     
-  output$anova1 <- renderDataTable(options = list(searching = FALSE, paging = FALSE), {
+  output$anova1 <- DT::renderDataTable(options = list(searching = FALSE, paging = FALSE), {
     req(input$autocorr_show && (input$p+input$q) != 0)
     df <- anova(md_null(), md()) %>% 
       mutate(call = c("Null autocorrelation model", modelText()))
@@ -254,7 +254,7 @@ server <- function(input, output) {
   null_q_text <- reactive({paste0(paste0("AR", input$p, " "), "MA0")})
     output$anova2_title <- renderText({req(input$autocorr_show && input$q!=0 && input$p!=0); paste0("ANOVA comparison: ", modelText(), " and ", null_q_text())})
   
-    output$anova2 <- renderDataTable(options = list(searching = FALSE, paging = FALSE), {
+    output$anova2 <- DT::renderDataTable(options = list(searching = FALSE, paging = FALSE), {
       req(input$q!=0  && input$p!=0)
     req(input$autocorr_show)
     df <- anova(md_null_q(), md_null()) %>% 
@@ -264,7 +264,7 @@ server <- function(input, output) {
     null_p_text <- reactive({paste0("AR0 ", paste0("MA", input$q, " "), "")})
     output$anova3_title <- renderText({req(input$autocorr_show && input$p!=0 && input$q!=0); paste0("ANOVA comparison: ", modelText(), " and ", null_p_text())})
   
-    output$anova3 <- renderDataTable(options = list(searching = FALSE, paging = FALSE), {
+    output$anova3 <- DT::renderDataTable(options = list(searching = FALSE, paging = FALSE), {
       req(input$p!=0 && input$q!=0)
     req(input$autocorr_show)
     df <- anova(md_null_p(), md_null()) %>% 
@@ -275,7 +275,7 @@ server <- function(input, output) {
 
     output$anova4_title <- renderText({req(input$autocorr_show && input$p==1 && input$q==3); paste0("ANOVA comparison: ", modelText(), " and AR1, MA1")})
   
-    output$anova4 <- renderDataTable(options = list(searching = FALSE, paging = FALSE), {
+    output$anova4 <- DT::renderDataTable(options = list(searching = FALSE, paging = FALSE), {
       req(input$p==1 && input$q==3)
     req(input$autocorr_show)
     df <- anova(md_null_p(), md_p1q1()) %>% 
@@ -283,7 +283,7 @@ server <- function(input, output) {
   })
   # temp bits --------------------------------------------------------------------------------------------------
   
-  output$data_table <- renderDataTable({req(input$int1date, input$group, input$dateRange)
+  output$data_table <- DT::renderDataTable({req(input$int1date, input$group, input$dateRange)
     df()})  
   
   
