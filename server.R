@@ -172,7 +172,9 @@ server <- function(input, output) {
   
   df <- reactive({filter(dfpre(), Date >= input$dateRange[1], Date <= input$dateRange[2])})
   
-  
+
+# models and arma corrected modelts ---------------------------------------
+
   md <- reactive({
     req(input$int1date, input$group, input$dateRange)
     gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52.14)  + endyr + begyr, data = df(), correlation = corARMA(p=input$p, q = input$q, form = ~ Time), method = "ML")
@@ -202,6 +204,11 @@ server <- function(input, output) {
   #   lm(adj_rate ~ Time + Int1 + Trend1 + cos((Time-4.6)*pi*2/52) + endyr + begyr, data = df())
   # })
   # 
+  
+
+# output plot -------------------------------------------------------------
+
+  
   cfac <- reactive({
     df() %>% mutate(Predict = md()$coefficients[1] +
                       md()$coefficients[2] * Time) %>% 
@@ -321,7 +328,7 @@ server <- function(input, output) {
     output$anova2 <- DT::renderDataTable(options = list(searching = FALSE, paging = FALSE), {
       req(input$q!=0  && input$p!=0)
     req(input$autocorr_show)
-    df <- anova(md_null_q(), md_null()) %>% 
+    df <- anova(md(), md_null_q()) %>% 
       mutate(call = c(modelText(), null_q_text()))
   })
     
@@ -331,7 +338,7 @@ server <- function(input, output) {
     output$anova3 <- DT::renderDataTable(options = list(searching = FALSE, paging = FALSE), {
       req(input$p!=0 && input$q!=0)
     req(input$autocorr_show)
-    df <- anova(md_null_p(), md_null()) %>% 
+    df <- anova(md(), md_null_p()) %>% 
       mutate(call = c(modelText(), null_p_text()))
   })
   
