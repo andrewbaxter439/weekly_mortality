@@ -37,6 +37,7 @@ ui <- fluidPage(
       column(4, uiOutput("obsRange"), align = "center")
    ),
    fluidRow(
+      # plotOutput("ggraph")),
       plotlyOutput("graph")),
    br(),
    fluidRow(column(12, align = "center", "Equation: $$Rate = \\beta_0+\\beta_1*Time+\\beta_2*Intervention_1+\\beta_3*Trend_1+\\beta_4*cos(Time)$$")),

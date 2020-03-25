@@ -6,6 +6,9 @@ library(lubridate)
 library(nlme)
 library(plotly)
 library(rvest)
+library(httr)
+library(readxl)
+library(tidyr)
 `-.gg` <- function(e1, e2) e2(e1)
 
 printCoefficients <- function(model){
@@ -105,7 +108,10 @@ server <- function(input, output) {
     dat_2020 <- import_2020 %>% 
       select(Year, Sex, Age, '1':ncol(.)) %>% 
       filter(!is.na(Sex)) %>% 
-      gather("Week", "deaths", -1:-3) %>% 
+      select_if(~!all(is.na(.x))) %>% 
+      mutate_at(-1:-3, ~ as.numeric(.x)) %>% 
+      pivot_longer(names_to = "Week", values_to = "deaths", cols = -1:-3) %>% 
+      mutate(Week = as.numeric(Week)) %>% 
       filter(!is.na(deaths),
              Week>max_2020) %>% 
       mutate_at(c(1,4,5), function(x) as.numeric(x))
@@ -116,7 +122,7 @@ server <- function(input, output) {
       mutate(Age = c("Under 1 year", "01-14", "15-44", "45-64", "65-74", "75-84", 
                      "85+"))
     
-    readRDS("data/pop_estimates.rds")
+    pop_2020 <- readRDS("data/pop_estimates.rds")
     
     data <- dat_2020 %>% 
       full_join(pop_2020, by = c("Year", "Age", "Sex")) %>% 
@@ -126,7 +132,7 @@ server <- function(input, output) {
       group_by(Sex, Year, Week) %>% 
       summarise(adj_rate = sum(expected_deaths, na.rm = TRUE)) %>% 
       ungroup() %>% 
-      bind_rows(f_data)
+      bind_rows(data)
     
   }
   
@@ -232,10 +238,49 @@ server <- function(input, output) {
                                      "Seasonal trend" = sphsu_cols("University Blue", names = FALSE),
                                      "Predicted" = sphsu_cols("Pumpkin", names = FALSE))) +
       theme_sphsu_light()+
-      ylab("Age-standardised mortality rate - deaths per 100,000")
+      ylab("Age-standardised mortality rate - deaths per 100,000") +
+      scale_x_date(date_breaks = "2 years", date_labels = "%Y")
     
     hide("loading-content", anim = TRUE, animType = "fade")
     ggplotly(plot, tooltip = "text")
+    
+  })
+  
+
+    output$ggraph <- renderPlot({
+    req(input$int1date, input$group, input$dateRange)
+    plot <- df() %>% 
+      mutate(
+        # Predict minus seasonal corrections
+        # Predict = md()$coefficients[1] +
+        #   md()$coefficients[2] * Time +
+        #   md()$coefficients[3] * Int1 +
+        #   md()$coefficients[4] * Trend1 +
+        #   md()$coefficients[5] * cos((Time-5)*pi*2/52),
+        Predict = predict(md(), newdata = df()),
+        lineTrend = md()$coefficients[1] +
+          md()$coefficients[2] * Time +
+          md()$coefficients[3] * Int1 +
+          md()$coefficients[4] * Trend1
+      ) %>% 
+      ggplot(aes(Date, adj_rate)) +
+      geom_point(aes(text = paste0("Week ending: ", Date, "<br>Week no: ", Week, "<br>Adjusted rate: ", round(adj_rate, 2)))) +
+      geom_line(data = cfac(), aes(Date, Predict, col = "Predicted"), linetype = "dashed", size = 1.5) +
+      geom_line(aes(y = Predict, group = Int1, col = "Seasonal trend"), size = 1.5, alpha = 0.8) +
+      geom_line(aes(y = lineTrend, group = Int1, col = "Trend"), size = 1.5, alpha = 0.8) +
+      geom_vline(xintercept = as.numeric(input$int1date),
+                 linetype = "dotted",
+                 col = "#000000CC"
+      ) +
+      scale_colour_manual(name = "",
+                          values = c("Trend" = sphsu_cols("Thistle", names = FALSE),
+                                     "Seasonal trend" = sphsu_cols("University Blue", names = FALSE),
+                                     "Predicted" = sphsu_cols("Pumpkin", names = FALSE))) +
+      theme_sphsu_light()+
+      ylab("Age-standardised mortality rate - deaths per 100,000")
+    
+    hide("loading-content", anim = TRUE, animType = "fade")
+    plot
     
   })
   

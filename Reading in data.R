@@ -147,6 +147,7 @@ allpops <- read_csv("data/HMD_allpops") %>%
   filter(grepl("GBRTENW", .$Code), Year > 2009) %>% 
   select(ageyr = Age, 2:6)
 
+estimates <- 
 
 agekeys <- tibble(ageyr = unique(allpops$ageyr)) %>%
   filter(!is.na(ageyr)) %>% 
@@ -174,11 +175,25 @@ full_ages <- pop_age_grps %>%
   bind_rows(pop_age_grps) %>% 
   group_by(Age, Sex) %>% 
   mutate(pop = zoo::na.approx(pop, rule = 2))
+
+pop_age_grps %>% 
+  filter(Year>=2015) %>% 
+  mutate(Year = Year + 3) %>% 
+  select(-pop) %>% 
+  bind_rows(pop_age_grps) %>% 
+  group_by(Age, Sex) %>% 
+  nest() %>% 
+  mutate(model = data %>% map(~lm(pop ~ Year, data = .))) %>% 
+  mutate(Pred = map2(model, data, predict)) %>% 
+  unnest(c(Pred, data)) %>% 
+  mutate(pop = ifelse(is.na(pop), Pred, pop)) %>% 
+  select(Age, Sex, Year)
+  
   
 pop_2020 <- full_ages %>% 
   filter(Year == 2020)
 
-  # saveRDS(pop_2020, "data/pop_estimates.rds")
+  saveRDS(pop_2020, "data/pop_estimates.rds")
 
 # estimates_18_19 <- pop_age_grps %>% 
 #   filter(Year>=2016) %>% 
