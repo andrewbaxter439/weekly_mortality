@@ -51,11 +51,11 @@ server <- function(input, output) {
   output$obsRange <- renderUI({
     dateRangeInput("dateRange",
                    "Dates to observe: ",
-                   # start = "2010-01-01",
+                   start = "2017-01-01",
                    # end = "2019-08-01",
                    # min = "2010-01-01",
                    # max = "2019-08-01")
-                   start = min(dfpre()$Date),
+                   # start = min(dfpre()$Date),
                    end = max(dfpre()$Date),
                    min = min(dfpre()$Date),
                    max = max(dfpre()$Date))
@@ -69,7 +69,7 @@ server <- function(input, output) {
     html_attr("href")
   part_url <- links[which(grepl("englandandwales%2f2020/publishedweek", links))]
   
-  weekpb <- as.numeric(gsub("^.*publishedweek(\\d{2})2020.xls", "\\1", part_url))
+  weekpb <- as.numeric(gsub("^.*publishedweek(\\d{2})2020.xlsx?", "\\1", part_url))
   
   max_2020 <- data %>% 
     filter(Year == 2020) %>% 
@@ -82,8 +82,8 @@ server <- function(input, output) {
       html_attr("href")
     part_url <- links[which(grepl("englandandwales%2f2020/publishedweek", links))]
     
-    GET(url = paste0("https://www.ons.gov.uk", part_url), write_disk(tf <- tempfile(fileext = ".xls")))
-    import_2020 <- read_xls(tf, sheet = 4, skip = 2)
+    GET(url = paste0("https://www.ons.gov.uk", part_url), write_disk(tf <- tempfile(fileext = ".xlsx")))
+    import_2020 <- read_excel(tf, sheet = "Weekly figures 2020", skip = 4)
     unlink(tf)
     
     colnames(import_2020)[2] <- "Age"

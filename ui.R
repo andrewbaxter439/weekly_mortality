@@ -32,7 +32,7 @@ ui <- fluidPage(
              align = "center"),
       column(4, dateInput("int1date",
                           "Select Exposure start date: ",
-                          value = "2016-01-01"),
+                          value = "2019-01-01"),
              align = "center"),
       column(4, uiOutput("obsRange"), align = "center")
    ),

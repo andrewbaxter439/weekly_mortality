@@ -1,0 +1,13 @@
+name: weekly_mortality
+title: weekly_mortality
+username:
+account: andybaxter
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2021075
+bundleId: 2944294
+url: https://andybaxter.shinyapps.io/weekly_mortality/
+when: 1585581428.53558
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .RData|stuff for correlation testing.R|old files/imported data.csv|old files/Reading in data.R|old files/server.R|old files/ui.R
