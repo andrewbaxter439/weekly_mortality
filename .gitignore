@@ -6,6 +6,7 @@
 data/*
 /graphs
 !data/imported_data.rds
+!data/pop_estimates.rds
 /old files
 stuff for correlation testing.R
 imported data.csv
