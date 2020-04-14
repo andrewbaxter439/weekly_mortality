@@ -9,6 +9,9 @@ library(rvest)
 library(httr)
 library(readxl)
 library(tidyr)
+library(patchwork)
+library(forecast)
+
 `-.gg` <- function(e1, e2) e2(e1)
 
 printCoefficients <- function(model){
@@ -18,9 +21,9 @@ printCoefficients <- function(model){
     print()
 }
 
-testAutocorr <- function(model, data=NULL, max.lag = 10, time.points = 25) {
+testAutocorr <- function(model, data=NULL, time.points = 115) {
   # data <- eval(model$call$data)
-  par(cex = 0.7, mai = c(0.1, 0.1, 0.2, 0.1))
+  # par(cex = 0.7, mai = c(0.1, 0.1, 0.2, 0.1))
   # par(fig = c(0.03, 1, 0.8, 1))
   # plot(
   #   data$Year[1:time.points],
@@ -30,22 +33,27 @@ testAutocorr <- function(model, data=NULL, max.lag = 10, time.points = 25) {
   #   col = "red"
   # )
   
-  par(fig = c(0.03, 0.5, 0.05, 0.9), new = TRUE)
-  acf(residuals(model, type = "normalized"))
+  # par(fig = c(0.03, 0.5, 0.05, 0.9), new = TRUE)
+  a <- ggAcf(residuals(model, type = "normalized"), lag.max = time.points)
   
-  par(fig = c(0.55, 1, 0.05, 0.9), new = TRUE)
-  acf(residuals(model, type = "normalized"), type = 'partial')
+  # par(fig = c(0.55, 1, 0.05, 0.9), new = TRUE)
+  p <- ggAcf(residuals(model, type = "normalized"), type = 'partial', lag.max = time.points)
+  
+  a + p
+  
 }
 
 data <- readRDS("data/imported_data.rds")
 
+  # reticulate::use_virtualenv(virtualenv = "C:/Python/.virtualenvs/shiny_env", required = TRUE)
 
 server <- function(input, output) {
+  
   
   # inputs -----------------------------------------------------------------------------------------------------
   
   
-  output$hello <- renderText("hello")
+  
   week_start <- reactive({floor((input$int1date - dmy("01/01/2010"))/dweeks(1))})
   
   output$obsRange <- renderUI({
@@ -67,20 +75,22 @@ server <- function(input, output) {
   links <- read_html("https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales") %>% 
     html_nodes("a") %>% 
     html_attr("href")
-  part_url <- links[which(grepl("englandandwales%2f2020/publishedweek", links))]
+  part_url <- links[which(grepl("englandandwales%2f2020/\\w*\\d*\\.xlsx?$", links))]
   
-  weekpb <- as.numeric(gsub("^.*publishedweek(\\d{2})2020.xlsx?", "\\1", part_url))
+  weekpb <- as.numeric(gsub("^.*(\\d{2})2020.xlsx?", "\\1", part_url))
   
   max_2020 <- data %>% 
     filter(Year == 2020) %>% 
     summarise(maxw = max(Week)) %>% 
     pull(maxw)
   
+  tryCatch(
+    error = function(cnd) "",
   if (max_2020 < weekpb){
-    links <- read_html("https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales") %>% 
-      html_nodes("a") %>% 
-      html_attr("href")
-    part_url <- links[which(grepl("englandandwales%2f2020/publishedweek", links))]
+    # links <- read_html("https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales") %>% 
+    #   html_nodes("a") %>% 
+    #   html_attr("href")
+    # part_url <- links[which(grepl("englandandwales%2f2020/publishedweek", links))]
     
     GET(url = paste0("https://www.ons.gov.uk", part_url), write_disk(tf <- tempfile(fileext = ".xlsx")))
     import_2020 <- read_excel(tf, sheet = "Weekly figures 2020", skip = 4)
@@ -89,27 +99,42 @@ server <- function(input, output) {
     colnames(import_2020)[2] <- "Age"
     
     start <- which(grepl("Males", import_2020$Age))[1] + 2
-    end <- start + 6
+    end <- start + 19
     
     import_2020[start:end, "Sex"] <- "male"
     
     start <- which(grepl("Females", import_2020$Age))[1] + 2
-    end <- start + 6
+    end <- start + 19
     
     import_2020[start:end, "Sex"] <- "female"
     
     start <- which(grepl("Persons", import_2020$Age))[1] + 2
-    end <- start + 6
+    end <- start + 19
     
     import_2020[start:end, "Sex"] <- "all"
     
     import_2020[, "Year"] <- 2020
     
+    grp_conversion <-     c("Under 1 year",
+                            rep("01-14", 3),
+                            rep("15-44", 6),
+                            rep("45-64", 4),
+                            rep("65-74", 2),
+                            rep("75-84", 2),
+                            rep("85+", 2)) %>% 
+      `names<-`(c("<1", "1-4", "5-9", "10-14", "15-19", "20-24", "25-29", "30-34", 
+                  "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", 
+                  "70-74", "75-79", "80-84", "85-89", "90+"))
+    
     dat_2020 <- import_2020 %>% 
       select(Year, Sex, Age, '1':ncol(.)) %>% 
       filter(!is.na(Sex)) %>% 
       select_if(~!all(is.na(.x))) %>% 
-      mutate_at(-1:-3, ~ as.numeric(.x)) %>% 
+      mutate(Age = grp_conversion[Age]) %>% 
+      group_by(Year, Sex, Age) %>% 
+      mutate_at(-(1:3), ~ as.numeric(.x)) %>% 
+      summarise_all(~ sum(.x)) %>% 
+      ungroup() %>% 
       pivot_longer(names_to = "Week", values_to = "deaths", cols = -1:-3) %>% 
       mutate(Week = as.numeric(Week)) %>% 
       filter(!is.na(deaths),
@@ -124,6 +149,7 @@ server <- function(input, output) {
     
     pop_2020 <- readRDS("data/pop_estimates.rds")
     
+    
     data <- dat_2020 %>% 
       full_join(pop_2020, by = c("Year", "Age", "Sex")) %>% 
       full_join(weights, by = c("Age")) %>% 
@@ -135,6 +161,7 @@ server <- function(input, output) {
       bind_rows(data)
     
   }
+  )
   
   
   # dataframe --------------------------------------------------------------------------------------------------

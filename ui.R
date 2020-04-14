@@ -1,6 +1,8 @@
 library(plotly)
 library(shinyjs)
 
+      # reticulate::use_virtualenv(virtualenv = "C:/Python/.virtualenvs/shiny_env", required = TRUE)
+
 appCSS <- "
 #loading-content {
   position: absolute;
@@ -24,6 +26,10 @@ ui <- fluidPage(
       div(id = "loading-content",
           h2("Checking for latest data and constructing graph"),
           h3("This will take a few seconds...")),
+      
+      # reticulate::py_run_string('print("")'),
+      
+      
       column(4,
              selectInput("group",
                          "Group to compare: ",
