@@ -11,6 +11,7 @@ library(readxl)
 library(tidyr)
 library(patchwork)
 library(forecast)
+library(tsModel)
 
 `-.gg` <- function(e1, e2) e2(e1)
 
@@ -65,7 +66,7 @@ server <- function(input, output) {
                    # max = "2019-08-01")
                    # start = min(dfpre()$Date),
                    end = max(dfpre()$Date),
-                   min = min(dfpre()$Date),
+                   min = min(dfpre()$Date)-days(7),
                    max = max(dfpre()$Date))
   })
   
@@ -77,7 +78,7 @@ server <- function(input, output) {
     html_attr("href")
   part_url <- links[which(grepl("englandandwales%2f2020/\\w*\\d*\\.xlsx?$", links))]
   
-  weekpb <- as.numeric(gsub("^.*(\\d{2})2020.xlsx?", "\\1", part_url))
+  weekpb <- as.numeric(gsub("^.*(\\d{2})2020.*xlsx?", "\\1", part_url))
   
   max_2020 <- data %>% 
     filter(Year == 2020) %>% 
@@ -204,27 +205,32 @@ server <- function(input, output) {
 
   md <- reactive({
     req(input$int1date, input$group, input$dateRange)
-    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52.14)  + endyr + begyr, data = df(), correlation = corARMA(p=input$p, q = input$q, form = ~ Time), method = "ML")
+    gls(adj_rate ~ Time + Int1 + Trend1+ harmonic(Time, 3, 52),#  + endyr + begyr,
+        data = df(), correlation = corARMA(p=input$p, q = input$q, form = ~ Time), method = "ML")
   })
 
     md_null_q <- reactive({
     req(input$int1date, input$group, input$dateRange)
-    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52.14)  + endyr + begyr, data = df(), correlation = corARMA(p=input$p, q = 0, form = ~ Time), method = "ML")
+    gls(adj_rate ~ Time + Int1 + Trend1+ harmonic(Time, 3, 52),#  + endyr + begyr,
+        data = df(), correlation = corARMA(p=input$p, q = 0, form = ~ Time), method = "ML")
   })
     
     md_null_p <- reactive({
     req(input$int1date, input$group, input$dateRange)
-    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52.14)  + endyr + begyr, data = df(), correlation = corARMA(p = 0, q = input$q, form = ~ Time), method = "ML")
+    gls(adj_rate ~ Time + Int1 + Trend1+ harmonic(Time, 3, 52),#  + endyr + begyr,
+        data = df(), correlation = corARMA(p = 0, q = input$q, form = ~ Time), method = "ML")
   })
 
         md_p1q1 <- reactive({
     req(input$int1date, input$group, input$dateRange)
-    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52.14)  + endyr + begyr, data = df(), correlation = corARMA(p = 1, q = 1, form = ~ Time), method = "ML")
+    gls(adj_rate ~ Time + Int1 + Trend1+ harmonic(Time, 3, 52),#  + endyr + begyr,
+        data = df(), correlation = corARMA(p = 1, q = 1, form = ~ Time), method = "ML")
   })
   
   md_null <- reactive({
     req(input$int1date, input$group, input$dateRange)
-    gls(adj_rate ~ Time + Int1 + Trend1+ cos((Time-4.6)*pi*2/52.14)  + endyr + begyr, data = df(), correlation = NULL, method = "ML")
+    gls(adj_rate ~ Time + Int1 + Trend1+ harmonic(Time, 3, 52),#  + endyr + begyr,
+        data = df(), correlation = NULL, method = "ML")
   })
   
   # lmd <- reactive({

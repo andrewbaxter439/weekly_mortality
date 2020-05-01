@@ -5,9 +5,9 @@ account: andybaxter
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 2021075
-bundleId: 2991440
+bundleId: 3091642
 url: https://andybaxter.shinyapps.io/weekly_mortality/
-when: 1586426567.66842
+when: 1588364441.36683
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: .RData|stuff for correlation testing.R|old files/imported data.csv|old files/Reading in data.R|old files/server.R|old files/ui.R
+ignoredFiles: .RData|.Rprofile|stuff for correlation testing.R|old files/imported data.csv|old files/Reading in data.R|old files/server.R|old files/ui.R|Python/py_sarimax.py|Python/python_arima.ipynb|Python/.ipynb_checkpoints/python_arima-checkpoint.ipynb

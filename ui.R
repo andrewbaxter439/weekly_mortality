@@ -38,7 +38,7 @@ ui <- fluidPage(
              align = "center"),
       column(4, dateInput("int1date",
                           "Select Exposure start date: ",
-                          value = "2019-01-01"),
+                          value = "2020-03-01"),
              align = "center"),
       column(4, uiOutput("obsRange"), align = "center")
    ),
@@ -50,7 +50,7 @@ ui <- fluidPage(
    fluidRow(DT::dataTableOutput("coefs")),
    br(),
    column(4, checkboxInput("autocorr_show", "Autocorrelation analysis")),
-   column(4, numericInput("p", "AR: ", 1, min = 0)),
+   column(4, numericInput("p", "AR: ", 3, min = 0)),
    column(4, numericInput("q", "MA: ", 1, min = 0)),
    br(),
    h4(textOutput("AC1title")),

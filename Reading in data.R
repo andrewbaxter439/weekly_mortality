@@ -93,7 +93,7 @@ links <- read_html("https://www.ons.gov.uk/peoplepopulationandcommunity/birthsde
   html_attr("href")
 part_url <- links[which(grepl("englandandwales%2f2020/\\w*\\d*\\.xlsx?$", links))]
 
-weekpb <- as.numeric(gsub("^.*(\\d{2})2020.xlsx?", "\\1", part_url))
+weekpb <- as.numeric(gsub("^.*(\\d{2})2020.*xlsx?", "\\1", part_url))
 
 
 # if (max(as.numeric(dat_2019$Week)) < weekpb){
