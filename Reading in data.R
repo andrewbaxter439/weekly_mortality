@@ -4,7 +4,7 @@
 library(ggplot2)
 library(readxl)
 library(httr)
-library(PHEindicatormethods)
+# library(PHEindicatormethods)
 library(purrr)
 library(dplyr)
 library(readr)
@@ -251,28 +251,29 @@ cfac <- df %>% mutate(Int1 = 0, Trend1 = 0,
                         md$coefficients[2] * Time) %>% 
   filter(Date>int1date)
 
-plotly_out <- df %>% 
-  mutate(Predict = predict(md, newdata = df),
-         lineTrend = md$coefficients[1] +
-           md$coefficients[2] * Time +
-           md$coefficients[3] * Int1 +
-           md$coefficients[4] * Trend1
-           ) %>% 
-  ggplot(aes(Date, adj_rate)) +
-  geom_point(aes(text = paste0("Week ending: ", Date, "<br>Week no: ", Week, "<br>Adjusted rate: ", round(adj_rate, 2)))) +
-  geom_line(data = cfac, aes(Date, Predict, col = "Predicted"), linetype = "dashed", size = 1.5) +
-  geom_line(aes(y = Predict, group = Int1, col = "Seasonal trend"), size = 1.5, alpha = 0.8) +
-  geom_line(aes(y = lineTrend, group = Int1, col = "Trend"), size = 1.5, alpha = 0.8) +
-  geom_vline(xintercept = as.numeric(int1date),
-             linetype = "dotted",
-             col = "#000000CC") +
-  scale_colour_manual(name = "",
-                      values = c("Trend" = sphsu_cols("Thistle", names = FALSE),
-                                 "Seasonal trend" = sphsu_cols("University Blue", names = FALSE),
-                                 "Predicted" = sphsu_cols("Pumpkin", names = FALSE))) +
-  SPHSUgraphs:::theme_sphsu_minimal()
-
-ggplotly(tooltip = "text") %>% api_create(filename = "Plot 12")
+# plotly_out <- df %>% 
+#   mutate(Predict = predict(md, newdata = df),
+#          lineTrend = md$coefficients[1] +
+#            md$coefficients[2] * Time +
+#            md$coefficients[3] * Int1 +
+#            md$coefficients[4] * Trend1
+#            ) %>% 
+#   ggplot(aes(Date, adj_rate)) +
+#   geom_point(aes(text = paste0("Week ending: ", Date, "<br>Week no: ", Week, "<br>Adjusted rate: ", round(adj_rate, 2)))) +
+#   geom_line(data = cfac, aes(Date, Predict, col = "Predicted"), linetype = "dashed", size = 1.5) +
+#   geom_line(aes(y = Predict, group = Int1, col = "Seasonal trend"), size = 1.5, alpha = 0.8) +
+#   geom_line(aes(y = lineTrend, group = Int1, col = "Trend"), size = 1.5, alpha = 0.8) +
+#   geom_vline(xintercept = as.numeric(int1date),
+#              linetype = "dotted",
+#              col = "#000000CC") +
+#   scale_colour_manual(name = "",
+#                       values = c("Trend" = sphsu_cols("Thistle", names = FALSE),
+#                                  "Seasonal trend" = sphsu_cols("University Blue", names = FALSE),
+#                                  "Predicted" = sphsu_cols("Pumpkin", names = FALSE))) +
+#   SPHSUgraphs:::theme_sphsu_minimal()
+#   theme_light()
+# 
+# ggplotly(tooltip = "text") %>% api_create(filename = "Plot 12")
 
 
 # Correction 1 - accounting for weeks 1/2 and 52/53 ----------------------------------------------------------

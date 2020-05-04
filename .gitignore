@@ -11,3 +11,4 @@ data/*
 stuff for correlation testing.R
 imported data.csv
 .Rprofile
+packrat/lib*/
