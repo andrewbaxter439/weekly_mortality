@@ -4,7 +4,7 @@
 library(ggplot2)
 library(readxl)
 library(httr)
-library(PHEindicatormethods)
+# library(PHEindicatormethods)
 library(purrr)
 library(dplyr)
 library(readr)
