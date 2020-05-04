@@ -1,5 +1,5 @@
 library(shiny)
-library(SPHSUgraphs)
+# library(SPHSUgraphs)
 library(readr)
 library(dplyr)
 library(lubridate)
@@ -274,10 +274,17 @@ server <- function(input, output) {
                  col = "#000000CC"
       ) +
       scale_colour_manual(name = "",
-                          values = c("Trend" = sphsu_cols("Thistle", names = FALSE),
-                                     "Seasonal trend" = sphsu_cols("University Blue", names = FALSE),
-                                     "Predicted" = sphsu_cols("Pumpkin", names = FALSE))) +
-      theme_sphsu_light()+
+                          values = c("Trend" = "#951272",
+                                     "Seasonal trend" = "#003865",
+                                     "Predicted" = "#FFB948")) +
+      theme_light(base_size = 12, base_family = "sans") +
+      theme(
+        panel.border     = element_rect(fill = NA, colour = NA),
+        axis.line        = element_line(colour = "grey70", size = rel(1)),
+        strip.background = element_rect(fill = "grey90", colour = NA),
+        strip.text = element_text(colour = "grey20",size = rel(0.8),
+                                  margin = margin(0.8 * 6, 0.8 * 6, 0.8 * 6, 0.8 * 6))
+      ) +
       ylab("Age-standardised mortality rate - deaths per 100,000") +
       scale_x_date(date_breaks = "2 years", date_labels = "%Y")
     
