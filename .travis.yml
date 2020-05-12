@@ -18,5 +18,5 @@ cache:
     - $TRAVIS_BUILD_DIR/packrat/src
 
 
-#script:
-#  - R -f run_tests.R
+script:
+  - R -f run_tests.R
