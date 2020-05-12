@@ -1,0 +1,13 @@
+name: Brexit_mortality
+title: Brexit_mortality
+username:
+account: andybaxter
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2238631
+bundleId: 3101497
+url: https://andybaxter.shinyapps.io/Brexit_mortality/
+when: 1588603222.13167
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .RData|.Rprofile
