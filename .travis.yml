@@ -5,17 +5,17 @@ sudo: false
 r: 3.6.3
 
 # Install packrat if needed and have it restore packages.
-install:
-  - R -e "0" --args --bootstrap-packrat
-  - R -e "packrat::restore(restart = FALSE)"
+#install:
+#  - R -e "0" --args --bootstrap-packrat
+#  - R -e "packrat::restore(restart = FALSE)"
 
-cache:
-  # Main R library
-  packages: true
-  directories:
-    # Packrat packages
-    - $TRAVIS_BUILD_DIR/packrat/lib
-    - $TRAVIS_BUILD_DIR/packrat/src
+#cache:
+#  # Main R library
+#  packages: true
+#  directories:
+#    # Packrat packages
+#    - $TRAVIS_BUILD_DIR/packrat/lib
+#    - $TRAVIS_BUILD_DIR/packrat/src
 
 
 script:
