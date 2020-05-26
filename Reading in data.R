@@ -159,6 +159,7 @@ weights <- read_csv("european_standard_population.csv") %>%
   summarise(wgt = sum(EuropeanStandardPopulation)) %>% 
   mutate(Age = unique(tidy_priors$Age))
 
+
 allpops <- read_csv("data/HMD_allpops") %>% 
   filter(grepl("GBRTENW", .$Code), Year > 2009) %>% 
   select(ageyr = Age, 2:6)
@@ -219,8 +220,8 @@ pop_2020 <- full_ages %>%
 data <- full_join(com_dat, full_ages, by = c("Year", "Age", "Sex")) %>% 
   filter(!is.na(Week)) %>%
   full_join(weights, by = "Age") %>% 
-  mutate(rate_crude = deaths/pop, 
-         expected_deaths = rate_crude * wgt) %>% 
+  mutate(rate_crude = 100000*deaths/pop, 
+         expected_deaths = rate_crude * wgt/100000) %>% 
   group_by(Sex, Year, Week) %>% 
   summarise(adj_rate = sum(expected_deaths, na.rm = TRUE)) %>% 
   ungroup()

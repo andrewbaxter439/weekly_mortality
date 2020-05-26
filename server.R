@@ -161,6 +161,66 @@ server <- function(input, output) {
       ungroup() %>% 
       bind_rows(data)
     
+
+# same for covid ----------------------------------------------------------
+
+    GET(url = paste0("https://www.ons.gov.uk", part_url), write_disk(tf <- tempfile(fileext = ".xlsx")))
+    import_2020 <- read_excel(tf, sheet = 'Covid-19 - Weekly registrations', skip = 4)
+    unlink(tf)
+    
+    colnames(import_2020)[2] <- "Age"
+    
+    start <- which(grepl("Males", import_2020$Age))[1] + 2
+    end <- start + 19
+    
+    import_2020[start:end, "Sex"] <- "male"
+    
+    start <- which(grepl("Females", import_2020$Age))[1] + 2
+    end <- start + 19
+    
+    import_2020[start:end, "Sex"] <- "female"
+    
+    start <- which(grepl("Persons", import_2020$Age))[1] + 2
+    end <- start + 19
+    
+    import_2020[start:end, "Sex"] <- "all"
+    
+    grp_conversion <-     c("Under 1 year",
+                            rep("01-14", 3),
+                            rep("15-44", 6),
+                            rep("45-64", 4),
+                            rep("65-74", 2),
+                            rep("75-84", 2),
+                            rep("85+", 2)) %>% 
+      `names<-`(c("<1", "1-4", "5-9", "10-14", "15-19", "20-24", "25-29", "30-34", 
+                  "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", 
+                  "70-74", "75-79", "80-84", "85-89", "90+"))
+    
+    
+    import_2020[, "Year"] <- 2020
+    
+    covid_2020 <-
+      import_2020 %>% 
+      select(Year, Sex, Age, '1':ncol(.)) %>% 
+      filter(!is.na(Sex)) %>% 
+      mutate(Age = grp_conversion[Age]) %>% 
+      group_by(Year, Sex, Age) %>% 
+      mutate_at(-(1:3), ~ as.numeric(.x)) %>% 
+      summarise_all(~ sum(.x)) %>% 
+      ungroup() %>% 
+      gather("Week", "deaths", -1:-3) %>% 
+      filter(!is.na(deaths)) %>% 
+      mutate_at(c(1,4,5), function(x) as.numeric(x))    
+    
+    cov_deaths <- covid_2020 %>% 
+      full_join(pop_2020, by = c("Year", "Age", "Sex")) %>% 
+      full_join(weights, by = c("Age")) %>% 
+      mutate(rate_crude = deaths/pop, 
+             expected_deaths = rate_crude * wgt) %>% 
+      group_by(Sex, Year, Week) %>% 
+      summarise(cov_rate = sum(expected_deaths, na.rm = TRUE)) %>% 
+      ungroup()
+    
   }
   )
   
@@ -185,6 +245,11 @@ server <- function(input, output) {
   
   dfpre <- reactive({
     data %>%
+      filter(!is.na(Week)) %>% 
+      left_join(cov_deaths, by = c("Year", "Week", "Sex")) %>% 
+      mutate_all(~replace_na(.x, 0)) %>% 
+      mutate(tot_rate = adj_rate, 
+             adj_rate = tot_rate - cov_rate) %>% 
       filter(Sex == tolower(input$group)) %>%
       arrange(Year, Week) %>%
       mutate(Time = 1:nrow(.)) %>%
@@ -258,14 +323,19 @@ server <- function(input, output) {
         #   md()$coefficients[3] * Int1 +
         #   md()$coefficients[4] * Trend1 +
         #   md()$coefficients[5] * cos((Time-5)*pi*2/52),
+        # cov_rate = ifelse(cov_rate==0, NA, cov_rate),
         Predict = predict(md(), newdata = df()),
         lineTrend = md()$coefficients[1] +
           md()$coefficients[2] * Time +
           md()$coefficients[3] * Int1 +
           md()$coefficients[4] * Trend1
       ) %>% 
-      ggplot(aes(Date, adj_rate)) +
-      geom_point(aes(text = paste0("Week ending: ", Date, "<br>Week no: ", Week, "<br>Adjusted rate: ", round(adj_rate, 2)))) +
+      ggplot(aes(Date)) +
+      # geom_point(aes(y = tot_rate), colour = "orange") +
+      # geom_point(aes(y = adj_rate), colour = "blue"  ) +
+      geom_point(aes(y = tot_rate, text = paste0("Week ending: ", Date, "<br>Week no: ", Week, "<br>Non-covid rate: ", round(adj_rate, 2), "<br>Covid rate: ", round(cov_rate, 2))), colour = "orange"  ) +
+      geom_point(aes(y = adj_rate, text = paste0("Week ending: ", Date, "<br>Week no: ", Week, "<br>Non-covid rate: ", round(adj_rate, 2), "<br>Covid rate: ", round(cov_rate, 2))), colour = "#003865") +
+      geom_ribbon(aes(ymin = adj_rate, ymax = tot_rate), fill = "orange", alpha = 0.2) +
       geom_line(data = cfac(), aes(Date, Predict, col = "Predicted"), linetype = "dashed", size = 1.5) +
       geom_line(aes(y = Predict, group = Int1, col = "Seasonal trend"), size = 1.5, alpha = 0.8) +
       geom_line(aes(y = lineTrend, group = Int1, col = "Trend"), size = 1.5, alpha = 0.8) +
