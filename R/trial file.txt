@@ -28,10 +28,10 @@ weekpb <- as.numeric(gsub("^.*(\\d{2})2020.*xlsx?", "\\1", part_url))
 
 # if (max(as.numeric(dat_2019$Week)) < weekpb){
 GET(url = paste0("https://www.ons.gov.uk", part_url), write_disk(tf <- tempfile(fileext = ".xlsx")))
-import_2020 <- read_excel(tf, sheet = 'Covid-19 - Weekly registrations', skip = 4)
+# import_2020 <- read_excel(tf, sheet = 'Covid-19 - Weekly registrations', skip = 4)
 unlink(tf)
 
-colnames(import_2020)[2] <- "Age"
+colnames(import_2020)[2] <- "Agebandit"
 
 start <- which(grepl("Males", import_2020$Age))[1] + 2
 end <- start + 19

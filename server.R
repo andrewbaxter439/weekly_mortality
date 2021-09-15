@@ -76,45 +76,44 @@ server <- function(input, output) {
   links <- read_html("https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales") %>% 
     html_nodes("a") %>% 
     html_attr("href")
-  part_url <- links[which(grepl("englandandwales%2f2020/\\w*\\d*\\.xlsx?$", links))]
+  part_url <- links[which(grepl("englandandwales/2021/\\w*\\d*\\.xlsx?$", links))]
   
-  weekpb <- as.numeric(gsub("^.*(\\d{2})2020.*xlsx?", "\\1", part_url))
+  weekpb <- as.numeric(gsub("^.*(\\d{2})202\\d.*xlsx?", "\\1", part_url))
   
   max_2020 <- data %>% 
-    filter(Year == 2020) %>% 
+    filter(Year %in% 2020) %>% 
     summarise(maxw = max(Week)) %>% 
     pull(maxw)
   
+
+
+
   tryCatch(
-    error = function(cnd) "",
-  if (max_2020 < weekpb){
-    # links <- read_html("https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales") %>% 
-    #   html_nodes("a") %>% 
-    #   html_attr("href")
-    # part_url <- links[which(grepl("englandandwales%2f2020/publishedweek", links))]
-    
+    error = function(cnd) warning("oopsies"),
+  if (TRUE){
+
     GET(url = paste0("https://www.ons.gov.uk", part_url), write_disk(tf <- tempfile(fileext = ".xlsx")))
-    import_2020 <- read_excel(tf, sheet = "Weekly figures 2020", skip = 4)
+    import_2021 <- read_excel(tf, sheet = "Weekly figures 2021", skip = 4)
     unlink(tf)
     
-    colnames(import_2020)[2] <- "Age"
+    colnames(import_2021)[2] <- "Age"
     
-    start <- which(grepl("Males", import_2020$Age))[1] + 2
+    start <- which(grepl("Males", import_2021$Age))[1] + 2
     end <- start + 19
     
-    import_2020[start:end, "Sex"] <- "male"
+    import_2021[start:end, "Sex"] <- "male"
     
-    start <- which(grepl("Females", import_2020$Age))[1] + 2
+    start <- which(grepl("Females", import_2021$Age))[1] + 2
     end <- start + 19
     
-    import_2020[start:end, "Sex"] <- "female"
+    import_2021[start:end, "Sex"] <- "female"
     
-    start <- which(grepl("Persons", import_2020$Age))[1] + 2
+    start <- which(grepl("People", import_2021$Age))[1] + 2
     end <- start + 19
     
-    import_2020[start:end, "Sex"] <- "all"
+    import_2021[start:end, "Sex"] <- "all"
     
-    import_2020[, "Year"] <- 2020
+    import_2021[, "Year"] <- 2021
     
     grp_conversion <-     c("Under 1 year",
                             rep("01-14", 3),
@@ -127,7 +126,7 @@ server <- function(input, output) {
                   "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", 
                   "70-74", "75-79", "80-84", "85-89", "90+"))
     
-    dat_2020 <- import_2020 %>% 
+    dat_2021 <- import_2021 %>% 
       select(Year, Sex, Age, '1':ncol(.)) %>% 
       filter(!is.na(Sex)) %>% 
       select_if(~!all(is.na(.x))) %>% 
@@ -139,7 +138,7 @@ server <- function(input, output) {
       pivot_longer(names_to = "Week", values_to = "deaths", cols = -1:-3) %>% 
       mutate(Week = as.numeric(Week)) %>% 
       filter(!is.na(deaths),
-             Week>max_2020) %>% 
+             Week>max_2021) %>% 
       mutate_at(c(1,4,5), function(x) as.numeric(x))
     
     weights <- read_csv("european_standard_population.csv") %>% 
@@ -148,11 +147,11 @@ server <- function(input, output) {
       mutate(Age = c("Under 1 year", "01-14", "15-44", "45-64", "65-74", "75-84", 
                      "85+"))
     
-    pop_2020 <- readRDS("data/pop_estimates.rds")
+    pop_2021 <- readRDS("data/pop_estimates.rds")
     
     
-    data <- dat_2020 %>% 
-      full_join(pop_2020, by = c("Year", "Age", "Sex")) %>% 
+    data <- dat_2021 %>% 
+      full_join(pop_2021, by = c("Year", "Age", "Sex")) %>% 
       full_join(weights, by = c("Age")) %>% 
       mutate(rate_crude = deaths/pop, 
              expected_deaths = rate_crude * wgt) %>% 
@@ -165,25 +164,25 @@ server <- function(input, output) {
 # same for covid ----------------------------------------------------------
 
     GET(url = paste0("https://www.ons.gov.uk", part_url), write_disk(tf <- tempfile(fileext = ".xlsx")))
-    import_2020 <- read_excel(tf, sheet = 'Covid-19 - Weekly registrations', skip = 4)
+    import_2021 <- read_excel(tf, sheet = 'Covid-19 - Weekly registrations', skip = 4)
     unlink(tf)
     
-    colnames(import_2020)[2] <- "Age"
+    colnames(import_2021)[2] <- "Age"
     
-    start <- which(grepl("Males", import_2020$Age))[1] + 2
+    start <- which(grepl("Males", import_2021$Age))[1] + 2
     end <- start + 19
     
-    import_2020[start:end, "Sex"] <- "male"
+    import_2021[start:end, "Sex"] <- "male"
     
-    start <- which(grepl("Females", import_2020$Age))[1] + 2
+    start <- which(grepl("Females", import_2021$Age))[1] + 2
     end <- start + 19
     
-    import_2020[start:end, "Sex"] <- "female"
+    import_2021[start:end, "Sex"] <- "female"
     
-    start <- which(grepl("Persons", import_2020$Age))[1] + 2
+    start <- which(grepl("Persons", import_2021$Age))[1] + 2
     end <- start + 19
     
-    import_2020[start:end, "Sex"] <- "all"
+    import_2021[start:end, "Sex"] <- "all"
     
     grp_conversion <-     c("Under 1 year",
                             rep("01-14", 3),
@@ -197,10 +196,10 @@ server <- function(input, output) {
                   "70-74", "75-79", "80-84", "85-89", "90+"))
     
     
-    import_2020[, "Year"] <- 2020
+    import_2021[, "Year"] <- 2021
     
-    covid_2020 <-
-      import_2020 %>% 
+    covid_2021 <-
+      import_2021 %>% 
       select(Year, Sex, Age, '1':ncol(.)) %>% 
       filter(!is.na(Sex)) %>% 
       mutate(Age = grp_conversion[Age]) %>% 
@@ -212,8 +211,8 @@ server <- function(input, output) {
       filter(!is.na(deaths)) %>% 
       mutate_at(c(1,4,5), function(x) as.numeric(x))    
     
-    cov_deaths <- covid_2020 %>% 
-      full_join(pop_2020, by = c("Year", "Age", "Sex")) %>% 
+    cov_deaths <- covid_2021 %>% 
+      full_join(pop_2021, by = c("Year", "Age", "Sex")) %>% 
       full_join(weights, by = c("Age")) %>% 
       mutate(rate_crude = deaths/pop, 
              expected_deaths = rate_crude * wgt) %>% 
@@ -221,6 +220,10 @@ server <- function(input, output) {
       summarise(cov_rate = sum(expected_deaths, na.rm = TRUE)) %>% 
       ungroup()
     
+    
+    data <- data %>%
+      filter(!is.na(Week)) %>%
+      left_join(cov_deaths, by = c("Year", "Week", "Sex"))
   }
   )
   
@@ -245,8 +248,8 @@ server <- function(input, output) {
   
   dfpre <- reactive({
     data %>%
-      filter(!is.na(Week)) %>% 
-      left_join(cov_deaths, by = c("Year", "Week", "Sex")) %>% 
+      # filter(!is.na(Week)) %>% 
+      # left_join(cov_deaths, by = c("Year", "Week", "Sex")) %>% 
       mutate_all(~replace_na(.x, 0)) %>% 
       mutate(tot_rate = adj_rate, 
              adj_rate = tot_rate - cov_rate) %>% 
